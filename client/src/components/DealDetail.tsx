@@ -21,6 +21,7 @@ import PriceDisplay from "./PriceDisplay";
 import ProgressBar from "./ProgressBar";
 import TierProgress from "./TierProgress";
 import ActivityFeed from "./ActivityFeed";
+import { calculatePositionPricing } from "@/lib/pricing";
 
 interface DealDetailProps {
   deal: {
@@ -79,6 +80,7 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
 
   const savings = originalPrice - currentPrice;
   const discount = Math.round((savings / originalPrice) * 100);
+  const { firstBuyerPrice, lastBuyerPrice, avgPrice } = calculatePositionPricing(currentPrice);
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -176,22 +178,56 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
 
             <Card className="border-primary/20 bg-primary/5">
               <CardContent className="p-4 space-y-4">
-                <div className="flex items-center gap-2 text-sm font-medium">
+                <div className="flex items-center justify-center gap-2 text-sm font-medium">
                   <div className="h-2 w-2 rounded-full bg-urgent animate-pulse" />
                   הדיל נסגר בעוד:
                 </div>
-                <CountdownTimer endTime={endTime} size="lg" />
+                <CountdownTimer endTime={endTime} size="lg" centered />
               </CardContent>
             </Card>
 
-            <div className="space-y-4">
-              <div className="text-sm text-muted-foreground">המחיר שלכם עכשיו:</div>
-              <PriceDisplay 
-                originalPrice={originalPrice} 
-                currentPrice={currentPrice}
-                size="lg"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="bg-muted/30">
+                <CardContent className="p-4 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">חנויות רגילות</p>
+                  <p className="text-xl font-bold line-through text-muted-foreground">
+                    ₪{originalPrice.toLocaleString()}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="bg-primary/10 border-primary/20">
+                <CardContent className="p-4 text-center">
+                  <p className="text-xs text-primary mb-1">DealRush</p>
+                  <p className="text-xl font-bold text-primary">
+                    ₪{currentPrice.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-success">חוסכים ₪{savings.toLocaleString()}</p>
+                </CardContent>
+              </Card>
             </div>
+
+            <Card className="bg-accent/30">
+              <CardContent className="p-4">
+                <p className="text-sm font-medium mb-2">מחיר לפי מיקום הצטרפות במדרגה הנוכחית:</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">ראשון במדרגה:</span>
+                    <span className="font-semibold text-success">₪{firstBuyerPrice.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">ממוצע:</span>
+                    <span className="font-semibold">₪{avgPrice.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">אחרון במדרגה:</span>
+                    <span className="font-semibold">₪{lastBuyerPrice.toLocaleString()}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3 p-2 bg-background/50 rounded">
+                  הראשון להצטרף לכל מדרגה מקבל 2.5% הנחה נוספת, האחרון משלם 2.5% יותר. הממוצע נשאר ₪{avgPrice.toLocaleString()}.
+                </p>
+              </CardContent>
+            </Card>
 
             <div className="flex items-center gap-3 p-3 rounded-md bg-muted/50">
               <div className="flex -space-x-2 space-x-reverse">

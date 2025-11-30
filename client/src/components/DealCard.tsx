@@ -1,10 +1,10 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, Clock, TrendingDown, Sparkles } from "lucide-react";
+import { Users, TrendingDown, Sparkles } from "lucide-react";
 import CountdownTimer from "./CountdownTimer";
 import ProgressBar from "./ProgressBar";
-import PriceDisplay from "./PriceDisplay";
+import { calculatePositionPricing } from "@/lib/pricing";
 
 export interface Deal {
   id: string;
@@ -18,6 +18,8 @@ export interface Deal {
   endTime: Date;
   nextTierPrice?: number;
   nextTierParticipants?: number;
+  category?: string;
+  discountPercent?: number;
 }
 
 interface DealCardProps {
@@ -44,6 +46,9 @@ export default function DealCard({ deal, onJoin, onView }: DealCardProps) {
     ? nextTierParticipants - participants 
     : null;
 
+  const discount = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+  const { firstBuyerPrice, lastBuyerPrice, avgPrice } = calculatePositionPricing(currentPrice);
+
   return (
     <Card 
       className="overflow-hidden hover-elevate cursor-pointer group"
@@ -64,28 +69,50 @@ export default function DealCard({ deal, onJoin, onView }: DealCardProps) {
           <Users className="h-3.5 w-3.5" />
           {participants} קונים
         </Badge>
+        <Badge 
+          className="absolute top-3 right-3 bg-success text-success-foreground"
+        >
+          -{discount}%
+        </Badge>
       </div>
       
-      <CardContent className="p-4 space-y-4">
+      <CardContent className="p-4 space-y-3">
         <h3 
-          className="font-semibold text-lg line-clamp-2 min-h-[3.5rem]"
+          className="font-semibold text-base line-clamp-2 min-h-[2.5rem]"
           data-testid={`deal-name-${id}`}
         >
           {name}
         </h3>
 
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="h-4 w-4" />
-          <span>נותר זמן:</span>
+        <div className="bg-muted/50 rounded-lg p-3">
+          <CountdownTimer endTime={endTime} size="sm" centered showLabels={false} />
         </div>
-        <CountdownTimer endTime={endTime} size="sm" />
 
-        <PriceDisplay 
-          originalPrice={originalPrice} 
-          currentPrice={currentPrice} 
-          size="sm"
-          showSavings={false}
-        />
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-muted/30 rounded-md p-2 text-center min-h-[60px] flex flex-col justify-center">
+            <p className="text-[10px] text-muted-foreground mb-0.5">חנויות רגילות</p>
+            <p className="font-bold text-sm line-through text-muted-foreground">
+              ₪{originalPrice.toLocaleString()}
+            </p>
+          </div>
+          <div className="bg-primary/10 border border-primary/20 rounded-md p-2 text-center min-h-[60px] flex flex-col justify-center">
+            <p className="text-[10px] text-primary mb-0.5">DealRush</p>
+            <p className="font-bold text-sm text-primary">
+              ₪{avgPrice.toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-accent/30 rounded-md p-2 text-xs">
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">ראשון משלם:</span>
+            <span className="font-semibold text-success">₪{firstBuyerPrice.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center mt-1">
+            <span className="text-muted-foreground">אחרון משלם:</span>
+            <span className="font-semibold">₪{lastBuyerPrice.toLocaleString()}</span>
+          </div>
+        </div>
 
         <ProgressBar 
           current={participants} 

@@ -89,25 +89,25 @@ export default function HowItWorksPage({ onGetStarted }: HowItWorksPageProps) {
 
       <section className="py-16">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center max-w-5xl mx-auto">
-            <Card className="bg-muted/30">
-              <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <Card className="bg-muted/30 h-full">
+              <CardContent className="p-6 h-full flex flex-col">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Clock className="h-5 w-5 text-muted-foreground" />
                   בחנויות רגילות
                 </h3>
-                <p className="text-muted-foreground">
+                <p className="text-muted-foreground flex-1">
                   אתם משלמים מחיר קבוע, בין אם אתם הקונה היחיד או אחד מבין אלפים. אין שום יתרון לקנייה קבוצתית.
                 </p>
               </CardContent>
             </Card>
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="p-6">
+            <Card className="border-primary/20 bg-primary/5 h-full">
+              <CardContent className="p-6 h-full flex flex-col">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <TrendingDown className="h-5 w-5 text-primary" />
                   ב-DealRush
                 </h3>
-                <p className="text-foreground">
+                <p className="text-foreground flex-1">
                   ככל שיותר אנשים קונים, המחיר יורד לכולם! כולם משלמים את המחיר הנמוך ביותר שהושג.
                 </p>
               </CardContent>

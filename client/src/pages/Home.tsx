@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
 import HeroSection from "@/components/HeroSection";
 import DealsGrid from "@/components/DealsGrid";
 import HowItWorks from "@/components/HowItWorks";
 import TrustBadges from "@/components/TrustBadges";
+import Categories from "@/components/Categories";
 
 import acImage from '@assets/generated_images/lg_inverter_air_conditioner.png';
 import tvImage from '@assets/generated_images/samsung_65_inch_tv.png';
@@ -17,6 +19,7 @@ interface HomeProps {
 
 export default function Home({ onOpenAuth }: HomeProps) {
   const [, setLocation] = useLocation();
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
 
   // todo: remove mock functionality
   const mockDeals = [
@@ -31,6 +34,8 @@ export default function Home({ onOpenAuth }: HomeProps) {
       endTime: new Date(Date.now() + 18 * 60 * 60 * 1000),
       nextTierPrice: 3510,
       nextTierParticipants: 100,
+      category: "electrical",
+      discountPercent: 18,
     },
     {
       id: "deal-2",
@@ -40,9 +45,11 @@ export default function Home({ onOpenAuth }: HomeProps) {
       currentPrice: 4875,
       participants: 52,
       targetParticipants: 100,
-      endTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+      endTime: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
       nextTierPrice: 4225,
       nextTierParticipants: 100,
+      category: "electronics",
+      discountPercent: 25,
     },
     {
       id: "deal-3",
@@ -52,9 +59,11 @@ export default function Home({ onOpenAuth }: HomeProps) {
       currentPrice: 890,
       participants: 134,
       targetParticipants: 150,
-      endTime: new Date(Date.now() + 5 * 60 * 60 * 1000),
+      endTime: new Date(Date.now() + 45 * 1000),
       nextTierPrice: 799,
       nextTierParticipants: 150,
+      category: "electronics",
+      discountPercent: 36,
     },
     {
       id: "deal-4",
@@ -64,9 +73,11 @@ export default function Home({ onOpenAuth }: HomeProps) {
       currentPrice: 2560,
       participants: 28,
       targetParticipants: 50,
-      endTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+      endTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
       nextTierPrice: 2400,
       nextTierParticipants: 50,
+      category: "electrical",
+      discountPercent: 20,
     },
     {
       id: "deal-5",
@@ -76,9 +87,11 @@ export default function Home({ onOpenAuth }: HomeProps) {
       currentPrice: 5625,
       participants: 45,
       targetParticipants: 80,
-      endTime: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
+      endTime: new Date(Date.now() + 12 * 60 * 60 * 1000),
       nextTierPrice: 5250,
       nextTierParticipants: 80,
+      category: "electronics",
+      discountPercent: 25,
     },
     {
       id: "deal-6",
@@ -88,11 +101,17 @@ export default function Home({ onOpenAuth }: HomeProps) {
       currentPrice: 780,
       participants: 89,
       targetParticipants: 100,
-      endTime: new Date(Date.now() + 12 * 60 * 60 * 1000),
+      endTime: new Date(Date.now() + 5 * 60 * 60 * 1000),
       nextTierPrice: 720,
       nextTierParticipants: 100,
+      category: "kitchen",
+      discountPercent: 35,
     },
   ];
+
+  const filteredDeals = selectedCategory 
+    ? mockDeals.filter(deal => deal.category === selectedCategory)
+    : mockDeals;
 
   const handleViewDeal = (dealId: string) => {
     setLocation(`/deal/${dealId}`);
@@ -108,9 +127,14 @@ export default function Home({ onOpenAuth }: HomeProps) {
         onGetStarted={() => document.getElementById('deals-section')?.scrollIntoView({ behavior: 'smooth' })}
         onLearnMore={() => setLocation('/how-it-works')}
       />
+      <Categories 
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
+      />
       <div id="deals-section">
         <DealsGrid 
-          deals={mockDeals}
+          deals={filteredDeals}
+          title={selectedCategory ? `דילים בקטגוריה` : "הדילים הפעילים עכשיו"}
           onViewDeal={handleViewDeal}
           onJoinDeal={handleJoinDeal}
         />
