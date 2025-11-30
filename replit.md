@@ -79,9 +79,13 @@ Preferred communication style: Simple, everyday language.
 
 **Data Validation**: Zod schemas for runtime validation, co-located with Drizzle table definitions for type safety.
 
+**Participants Schema** (`shared/schema.ts`):
+- id, dealId, name, pricePaid, position, joinedAt
+- Position determines price within tier (±2.5% variance)
+- Privacy: UI displays initials only (e.g., "ד.ל." instead of full name)
+
 **Future Schema Needs**:
 - Orders/Transactions table
-- Participants junction table (users to deals)
 - Price history for tier tracking
 
 ### Design System & UI Patterns
@@ -104,6 +108,11 @@ Preferred communication style: Simple, everyday language.
 - **PriceDisplay**: Formatted pricing with original/current price and savings
 - **ActivityFeed**: Real-time social proof of other users joining
 - **AdminPage**: Full CRUD management for deals with forms for images, pricing, and tiers
+- **ParticipantsList**: Shows all deal participants with privacy-protected initials, individual prices, and position-based discounts
+
+**Deal Detail Layout** (RTL):
+- Right side: Product title, description, pricing, countdown timer, join button
+- Left side: Image gallery with thumbnails
 
 ### Pricing System
 
