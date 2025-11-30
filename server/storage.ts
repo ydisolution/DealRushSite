@@ -1,10 +1,21 @@
-import { type User, type InsertUser, type Deal, type InsertDeal, type Participant, type InsertParticipant } from "@shared/schema";
+import { 
+  type User, 
+  type UpsertUser, 
+  type Deal, 
+  type InsertDeal, 
+  type Participant, 
+  type InsertParticipant,
+  users,
+  deals,
+  participants 
+} from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: UpsertUser): Promise<User>;
   
   getDeals(): Promise<Deal[]>;
   getDeal(id: string): Promise<Deal | undefined>;
@@ -14,18 +25,101 @@ export interface IStorage {
   deleteDeal(id: string): Promise<boolean>;
   
   getParticipantsByDeal(dealId: string): Promise<Participant[]>;
+  getParticipantsByUser(userId: string): Promise<Participant[]>;
   addParticipant(participant: InsertParticipant): Promise<Participant>;
 }
 
+export class DatabaseStorage implements IStorage {
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
+  }
+
+  async getDeals(): Promise<Deal[]> {
+    return await db.select().from(deals).where(eq(deals.isActive, "true"));
+  }
+
+  async getDeal(id: string): Promise<Deal | undefined> {
+    const [deal] = await db.select().from(deals).where(eq(deals.id, id));
+    return deal;
+  }
+
+  async getDealsByCategory(category: string): Promise<Deal[]> {
+    const allDeals = await db.select().from(deals).where(eq(deals.category, category));
+    return allDeals.filter(d => d.isActive === "true");
+  }
+
+  async createDeal(insertDeal: InsertDeal): Promise<Deal> {
+    const [deal] = await db
+      .insert(deals)
+      .values({
+        ...insertDeal,
+        description: insertDeal.description ?? null,
+        participants: insertDeal.participants ?? 0,
+        specs: insertDeal.specs ?? [],
+        isActive: insertDeal.isActive ?? "true",
+      })
+      .returning();
+    return deal;
+  }
+
+  async updateDeal(id: string, updates: Partial<InsertDeal>): Promise<Deal | undefined> {
+    const [deal] = await db
+      .update(deals)
+      .set(updates)
+      .where(eq(deals.id, id))
+      .returning();
+    return deal;
+  }
+
+  async deleteDeal(id: string): Promise<boolean> {
+    const result = await db.delete(deals).where(eq(deals.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getParticipantsByDeal(dealId: string): Promise<Participant[]> {
+    const result = await db.select().from(participants).where(eq(participants.dealId, dealId));
+    return result.sort((a, b) => a.position - b.position);
+  }
+
+  async getParticipantsByUser(userId: string): Promise<Participant[]> {
+    const result = await db.select().from(participants).where(eq(participants.userId, userId));
+    return result;
+  }
+
+  async addParticipant(insertParticipant: InsertParticipant): Promise<Participant> {
+    const [participant] = await db
+      .insert(participants)
+      .values(insertParticipant)
+      .returning();
+    return participant;
+  }
+}
+
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private deals: Map<string, Deal>;
-  private participants: Map<string, Participant>;
+  private usersMap: Map<string, User>;
+  private dealsMap: Map<string, Deal>;
+  private participantsMap: Map<string, Participant>;
 
   constructor() {
-    this.users = new Map();
-    this.deals = new Map();
-    this.participants = new Map();
+    this.usersMap = new Map();
+    this.dealsMap = new Map();
+    this.participantsMap = new Map();
     this.seedDeals();
     this.seedParticipants();
   }
@@ -180,37 +274,39 @@ export class MemStorage implements IStorage {
     ];
 
     sampleDeals.forEach(deal => {
-      this.deals.set(deal.id, deal);
+      this.dealsMap.set(deal.id, deal);
     });
   }
 
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    return this.usersMap.get(id);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const existing = userData.id ? this.usersMap.get(userData.id) : undefined;
+    const user: User = {
+      id: userData.id || randomUUID(),
+      email: userData.email ?? null,
+      firstName: userData.firstName ?? null,
+      lastName: userData.lastName ?? null,
+      profileImageUrl: userData.profileImageUrl ?? null,
+      createdAt: existing?.createdAt ?? new Date(),
+      updatedAt: new Date(),
+    };
+    this.usersMap.set(user.id, user);
     return user;
   }
 
   async getDeals(): Promise<Deal[]> {
-    return Array.from(this.deals.values()).filter(d => d.isActive === "true");
+    return Array.from(this.dealsMap.values()).filter(d => d.isActive === "true");
   }
 
   async getDeal(id: string): Promise<Deal | undefined> {
-    return this.deals.get(id);
+    return this.dealsMap.get(id);
   }
 
   async getDealsByCategory(category: string): Promise<Deal[]> {
-    return Array.from(this.deals.values()).filter(
+    return Array.from(this.dealsMap.values()).filter(
       d => d.category === category && d.isActive === "true"
     );
   }
@@ -226,21 +322,21 @@ export class MemStorage implements IStorage {
       isActive: insertDeal.isActive ?? "true",
       createdAt: new Date(),
     };
-    this.deals.set(id, deal);
+    this.dealsMap.set(id, deal);
     return deal;
   }
 
   async updateDeal(id: string, updates: Partial<InsertDeal>): Promise<Deal | undefined> {
-    const existing = this.deals.get(id);
+    const existing = this.dealsMap.get(id);
     if (!existing) return undefined;
     
     const updated: Deal = { ...existing, ...updates };
-    this.deals.set(id, updated);
+    this.dealsMap.set(id, updated);
     return updated;
   }
 
   async deleteDeal(id: string): Promise<boolean> {
-    return this.deals.delete(id);
+    return this.dealsMap.delete(id);
   }
 
   private seedParticipants() {
@@ -263,7 +359,7 @@ export class MemStorage implements IStorage {
     };
     
     Object.entries(dealParticipantCounts).forEach(([dealId, count]) => {
-      const deal = this.deals.get(dealId);
+      const deal = this.dealsMap.get(dealId);
       if (!deal) return;
       
       for (let i = 0; i < count; i++) {
@@ -284,21 +380,27 @@ export class MemStorage implements IStorage {
         const participant: Participant = {
           id: String(participantId++),
           dealId,
+          userId: null,
           name: randomName,
           pricePaid,
           position,
           joinedAt: joinTime,
         };
         
-        this.participants.set(participant.id, participant);
+        this.participantsMap.set(participant.id, participant);
       }
     });
   }
 
   async getParticipantsByDeal(dealId: string): Promise<Participant[]> {
-    return Array.from(this.participants.values())
+    return Array.from(this.participantsMap.values())
       .filter(p => p.dealId === dealId)
       .sort((a, b) => a.position - b.position);
+  }
+
+  async getParticipantsByUser(userId: string): Promise<Participant[]> {
+    return Array.from(this.participantsMap.values())
+      .filter(p => p.userId === userId);
   }
 
   async addParticipant(insertParticipant: InsertParticipant): Promise<Participant> {
@@ -306,9 +408,10 @@ export class MemStorage implements IStorage {
     const participant: Participant = {
       ...insertParticipant,
       id,
+      userId: insertParticipant.userId ?? null,
       joinedAt: new Date(),
     };
-    this.participants.set(id, participant);
+    this.participantsMap.set(id, participant);
     return participant;
   }
 }
