@@ -46,7 +46,15 @@ Preferred communication style: Simple, everyday language.
 
 **Static File Serving**: Production builds serve static files from `dist/public` directory with SPA fallback to `index.html`.
 
-**Storage Interface**: Abstracted storage layer (`IStorage` interface) with in-memory implementation (`MemStorage`). Designed to be swapped with database implementations without changing business logic.
+**Storage Interface**: Abstracted storage layer (`IStorage` interface) with in-memory implementation (`MemStorage`). Includes CRUD operations for deals and users. Designed to be swapped with database implementations without changing business logic.
+
+**API Endpoints**:
+- GET `/api/deals` - List all active deals
+- GET `/api/deals/:id` - Get single deal by ID
+- POST `/api/deals` - Create new deal
+- PATCH `/api/deals/:id` - Update existing deal
+- DELETE `/api/deals/:id` - Delete deal
+- POST `/api/upload` - Upload images (multer middleware)
 
 **Build System**: Custom esbuild configuration that bundles server code with selective dependency bundling (allowlist approach) to optimize cold start times.
 
@@ -54,14 +62,24 @@ Preferred communication style: Simple, everyday language.
 
 **Database ORM**: Drizzle ORM configured for PostgreSQL (via `@neondatabase/serverless`).
 
-**Schema Design**: Currently minimal with a users table. Schema definitions use Drizzle's pg-core with Zod validation via `drizzle-zod`.
+**Schema Design**: Includes users and deals tables. Schema definitions use Drizzle's pg-core with Zod validation via `drizzle-zod`.
+
+**Deals Schema** (`shared/schema.ts`):
+- id, name, description, category
+- images (array of URLs)
+- originalPrice, currentPrice, participants, targetParticipants
+- endTime (timestamp)
+- tiers (JSON array with minParticipants, maxParticipants, discount, price)
+- specs (JSON array of label/value pairs)
+- isActive, createdAt
+
+**Categories**: apartments, electrical, furniture, electronics, home, fashion
 
 **Migration Strategy**: Drizzle Kit for schema migrations, output to `./migrations` directory.
 
 **Data Validation**: Zod schemas for runtime validation, co-located with Drizzle table definitions for type safety.
 
-**Future Schema Needs** (based on application logic):
-- Deals table (products, pricing tiers, participant counts, end times)
+**Future Schema Needs**:
 - Orders/Transactions table
 - Participants junction table (users to deals)
 - Price history for tier tracking
@@ -85,6 +103,7 @@ Preferred communication style: Simple, everyday language.
 - **TierProgress**: Shows pricing tiers and progress toward next discount level
 - **PriceDisplay**: Formatted pricing with original/current price and savings
 - **ActivityFeed**: Real-time social proof of other users joining
+- **AdminPage**: Full CRUD management for deals with forms for images, pricing, and tiers
 
 ### Pricing System
 
