@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Zap, Menu, X, User, ShoppingBag, Bell } from "lucide-react";
+import { Zap, Menu, X, User, ShoppingBag, Bell, Settings } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface HeaderProps {
@@ -25,6 +25,7 @@ export default function Header({
     { href: "/", label: "דף הבית" },
     { href: "/deals", label: "דילים פעילים" },
     { href: "/how-it-works", label: "איך זה עובד" },
+    { href: "/admin", label: "ניהול" },
   ];
 
   const isActive = (href: string) => location === href;

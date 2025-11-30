@@ -13,6 +13,7 @@ import DealPage from "@/pages/DealPage";
 import HowItWorksPageRoute from "@/pages/HowItWorksPageRoute";
 import DashboardPage from "@/pages/DashboardPage";
 import CheckoutPage from "@/pages/CheckoutPage";
+import AdminPage from "@/pages/AdminPage";
 
 function Router({ 
   isLoggedIn, 
@@ -37,6 +38,7 @@ function Router({
         )}
       </Route>
       <Route path="/checkout/:id" component={CheckoutPage} />
+      <Route path="/admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>
   );
