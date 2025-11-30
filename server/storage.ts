@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Deal, type InsertDeal } from "@shared/schema";
+import { type User, type InsertUser, type Deal, type InsertDeal, type Participant, type InsertParticipant } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -12,16 +12,22 @@ export interface IStorage {
   createDeal(deal: InsertDeal): Promise<Deal>;
   updateDeal(id: string, deal: Partial<InsertDeal>): Promise<Deal | undefined>;
   deleteDeal(id: string): Promise<boolean>;
+  
+  getParticipantsByDeal(dealId: string): Promise<Participant[]>;
+  addParticipant(participant: InsertParticipant): Promise<Participant>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private deals: Map<string, Deal>;
+  private participants: Map<string, Participant>;
 
   constructor() {
     this.users = new Map();
     this.deals = new Map();
+    this.participants = new Map();
     this.seedDeals();
+    this.seedParticipants();
   }
 
   private seedDeals() {
@@ -235,6 +241,75 @@ export class MemStorage implements IStorage {
 
   async deleteDeal(id: string): Promise<boolean> {
     return this.deals.delete(id);
+  }
+
+  private seedParticipants() {
+    const hebrewNames = [
+      "דוד לוי", "שרה כהן", "יוסף ברק", "מרים אברהם", "אלי גולן",
+      "רחל מזרחי", "משה פרידמן", "לאה שפירא", "יעקב רוזן", "דינה כץ",
+      "אבי נגר", "תמר בן דוד", "עמית שלום", "נועה דהן", "אורי פרץ",
+      "מיכל אוזן", "רון שמעון", "איילת גבאי", "גיל חיים", "דנה צור",
+      "עידו מלכה", "הילה אסף", "יונתן בר", "שני רביב", "טל אמיר",
+      "מאיה סהר", "אריאל נוי", "רותם בלום", "ליאור גל", "נועם אדם",
+      "עדי קרן", "יובל ים", "שירה הר", "ניר בן", "קרן טל",
+      "אסף רז", "גלית שלו", "עומר פז", "הדר מור", "ליאת נור"
+    ];
+    
+    const now = new Date();
+    let participantId = 1;
+    
+    const dealParticipantCounts: { [key: string]: number } = {
+      "1": 45, "2": 78, "3": 156, "4": 23, "5": 12, "6": 34
+    };
+    
+    Object.entries(dealParticipantCounts).forEach(([dealId, count]) => {
+      const deal = this.deals.get(dealId);
+      if (!deal) return;
+      
+      for (let i = 0; i < count; i++) {
+        const position = i + 1;
+        const tierIndex = deal.tiers.findIndex(t => position >= t.minParticipants && position <= t.maxParticipants);
+        const tier = deal.tiers[tierIndex] || deal.tiers[0];
+        
+        const positionInTier = position - tier.minParticipants;
+        const tierRange = tier.maxParticipants - tier.minParticipants + 1;
+        const positionRatio = positionInTier / tierRange;
+        const priceVariance = (positionRatio - 0.5) * 0.05;
+        const basePrice = tier.price || deal.originalPrice * (1 - tier.discount / 100);
+        const pricePaid = Math.round(basePrice * (1 + priceVariance));
+        
+        const randomName = hebrewNames[Math.floor(Math.random() * hebrewNames.length)];
+        const joinTime = new Date(now.getTime() - Math.random() * 7 * 24 * 60 * 60 * 1000);
+        
+        const participant: Participant = {
+          id: String(participantId++),
+          dealId,
+          name: randomName,
+          pricePaid,
+          position,
+          joinedAt: joinTime,
+        };
+        
+        this.participants.set(participant.id, participant);
+      }
+    });
+  }
+
+  async getParticipantsByDeal(dealId: string): Promise<Participant[]> {
+    return Array.from(this.participants.values())
+      .filter(p => p.dealId === dealId)
+      .sort((a, b) => a.position - b.position);
+  }
+
+  async addParticipant(insertParticipant: InsertParticipant): Promise<Participant> {
+    const id = randomUUID();
+    const participant: Participant = {
+      ...insertParticipant,
+      id,
+      joinedAt: new Date(),
+    };
+    this.participants.set(id, participant);
+    return participant;
   }
 }
 

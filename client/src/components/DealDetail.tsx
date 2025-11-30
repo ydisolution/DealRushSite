@@ -21,6 +21,7 @@ import PriceDisplay from "./PriceDisplay";
 import ProgressBar from "./ProgressBar";
 import TierProgress from "./TierProgress";
 import ActivityFeed from "./ActivityFeed";
+import ParticipantsList from "./ParticipantsList";
 import { calculatePositionPricing } from "@/lib/pricing";
 
 interface DealDetailProps {
@@ -112,63 +113,8 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
         </Button>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="space-y-4">
-            <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-              <img 
-                src={images[currentImageIndex]} 
-                alt={name}
-                className="w-full h-full object-cover"
-                data-testid="deal-main-image"
-              />
-              {images.length > 1 && (
-                <>
-                  <Button 
-                    variant="secondary" 
-                    size="icon"
-                    className="absolute right-4 top-1/2 -translate-y-1/2"
-                    onClick={prevImage}
-                    data-testid="button-prev-image"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="secondary" 
-                    size="icon"
-                    className="absolute left-4 top-1/2 -translate-y-1/2"
-                    onClick={nextImage}
-                    data-testid="button-next-image"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-              <Badge 
-                className="absolute top-4 left-4 gap-1.5 bg-background/90 backdrop-blur-sm text-foreground border"
-              >
-                <Users className="h-3.5 w-3.5" />
-                {participants} קונים
-              </Badge>
-            </div>
-            
-            {images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentImageIndex(idx)}
-                    className={`shrink-0 w-20 h-20 rounded-md overflow-hidden border-2 transition-colors ${
-                      idx === currentImageIndex ? "border-primary" : "border-transparent"
-                    }`}
-                    data-testid={`thumbnail-${idx}`}
-                  >
-                    <img src={img} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-6">
+          {/* Right side - Text, description and price (RTL) */}
+          <div className="space-y-6 order-1 lg:order-2">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold mb-2" data-testid="deal-title">
                 {name}
@@ -280,6 +226,63 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
               </div>
             </div>
           </div>
+
+          {/* Left side - Image gallery (RTL) */}
+          <div className="space-y-4 order-2 lg:order-1">
+            <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
+              <img 
+                src={images[currentImageIndex]} 
+                alt={name}
+                className="w-full h-full object-cover"
+                data-testid="deal-main-image"
+              />
+              {images.length > 1 && (
+                <>
+                  <Button 
+                    variant="secondary" 
+                    size="icon"
+                    className="absolute right-4 top-1/2 -translate-y-1/2"
+                    onClick={prevImage}
+                    data-testid="button-prev-image"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    size="icon"
+                    className="absolute left-4 top-1/2 -translate-y-1/2"
+                    onClick={nextImage}
+                    data-testid="button-next-image"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              <Badge 
+                className="absolute top-4 left-4 gap-1.5 bg-background/90 backdrop-blur-sm text-foreground border"
+              >
+                <Users className="h-3.5 w-3.5" />
+                {participants} קונים
+              </Badge>
+            </div>
+            
+            {images.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentImageIndex(idx)}
+                    className={`shrink-0 w-20 h-20 rounded-md overflow-hidden border-2 transition-colors ${
+                      idx === currentImageIndex ? "border-primary" : "border-transparent"
+                    }`}
+                    data-testid={`thumbnail-${idx}`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-12">
@@ -375,6 +378,10 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
               tiers={tiers} 
               currentParticipants={participants}
               originalPrice={originalPrice}
+            />
+            <ParticipantsList 
+              dealId={deal.id} 
+              originalPrice={originalPrice} 
             />
             <ActivityFeed activities={activities} />
           </div>

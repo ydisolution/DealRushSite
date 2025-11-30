@@ -160,5 +160,14 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/deals/:id/participants", async (req: Request, res: Response) => {
+    try {
+      const participants = await storage.getParticipantsByDeal(req.params.id);
+      res.json(participants);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch participants" });
+    }
+  });
+
   return httpServer;
 }

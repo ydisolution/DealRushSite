@@ -68,3 +68,30 @@ export const CATEGORIES = [
 ] as const;
 
 export type CategoryId = typeof CATEGORIES[number]["id"];
+
+export const participantSchema = z.object({
+  id: z.string(),
+  dealId: z.string(),
+  name: z.string(),
+  pricePaid: z.number(),
+  position: z.number(),
+  joinedAt: z.date(),
+});
+
+export type Participant = z.infer<typeof participantSchema>;
+
+export const participants = pgTable("participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull(),
+  name: text("name").notNull(),
+  pricePaid: integer("price_paid").notNull(),
+  position: integer("position").notNull(),
+  joinedAt: timestamp("joined_at").notNull().default(sql`now()`),
+});
+
+export const insertParticipantSchema = createInsertSchema(participants).omit({
+  id: true,
+  joinedAt: true,
+});
+
+export type InsertParticipant = z.infer<typeof insertParticipantSchema>;
