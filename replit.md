@@ -156,7 +156,9 @@ Preferred communication style: Simple, everyday language.
 - Drizzle ORM v0.39
 - @neondatabase/serverless for PostgreSQL connection
 - Zod for validation
-- connect-pg-simple for session storage (configured but not yet implemented)
+- connect-pg-simple for PostgreSQL session storage
+- openid-client for Replit Auth OAuth2/OIDC
+- passport and passport-local for authentication middleware
 
 ### Build Tools & Development
 
@@ -178,10 +180,34 @@ Preferred communication style: Simple, everyday language.
 - Configured through `DATABASE_URL` environment variable
 - Drizzle Kit for schema management and migrations
 
+### Authentication System
+
+**Implementation**: Replit Auth with OpenID Connect (OAuth 2.0)
+- Supports Google, GitHub, Apple, and email/password authentication
+- Uses PostgreSQL session storage via connect-pg-simple
+- Protocol-aware strategy caching for mixed HTTP/HTTPS deployments
+- Strategy names include protocol: `replitauth:${protocol}:${domain}`
+
+**Key Files**:
+- `server/replitAuth.ts` - Passport OIDC strategy configuration
+- `client/src/hooks/useAuth.ts` - React hook for auth state
+- `client/src/lib/authUtils.ts` - Auth utility functions
+
+**Auth Endpoints**:
+- GET `/api/login` - Initiates OAuth flow
+- GET `/api/callback` - OAuth callback handler
+- GET `/api/logout` - Logs out user
+- GET `/api/auth/user` - Returns current user (protected)
+- GET `/api/user/purchases` - User purchase history (protected)
+
+**Session Configuration**:
+- PostgreSQL-backed sessions (connect-pg-simple)
+- Secure cookie flag based on NODE_ENV
+- 7-day session expiration
+
 ### Future Integration Points
 
 Based on checkout and payment flows in components:
 - Payment processor integration needed (Stripe dependencies present)
 - Email service for notifications (nodemailer present)
-- Session management (express-session configured)
 - File upload handling (multer present)
