@@ -7,31 +7,57 @@ import {
   type InsertParticipant,
   users,
   deals,
-  participants 
+  participants,
+  emailLogs,
+  type EmailLog
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and, lt, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByVerificationToken(token: string): Promise<User | undefined>;
+  getUserByPasswordResetToken(token: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUser(id: string, updates: Partial<UpsertUser>): Promise<User | undefined>;
   
   getDeals(): Promise<Deal[]>;
   getDeal(id: string): Promise<Deal | undefined>;
   getDealsByCategory(category: string): Promise<Deal[]>;
+  getActiveDealsClosingBefore(date: Date): Promise<Deal[]>;
   createDeal(deal: InsertDeal): Promise<Deal>;
   updateDeal(id: string, deal: Partial<InsertDeal>): Promise<Deal | undefined>;
   deleteDeal(id: string): Promise<boolean>;
   
   getParticipantsByDeal(dealId: string): Promise<Participant[]>;
   getParticipantsByUser(userId: string): Promise<Participant[]>;
+  getParticipant(id: string): Promise<Participant | undefined>;
   addParticipant(participant: InsertParticipant): Promise<Participant>;
+  updateParticipant(id: string, updates: Partial<InsertParticipant>): Promise<Participant | undefined>;
+  
+  logEmail(log: Partial<EmailLog>): Promise<EmailLog>;
 }
 
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async getUserByVerificationToken(token: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.emailVerificationToken, token));
+    return user;
+  }
+
+  async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.passwordResetToken, token));
     return user;
   }
 
@@ -50,6 +76,15 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUser(id: string, updates: Partial<UpsertUser>): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
   async getDeals(): Promise<Deal[]> {
     return await db.select().from(deals).where(eq(deals.isActive, "true"));
   }
@@ -64,6 +99,15 @@ export class DatabaseStorage implements IStorage {
     return allDeals.filter(d => d.isActive === "true");
   }
 
+  async getActiveDealsClosingBefore(date: Date): Promise<Deal[]> {
+    return await db.select().from(deals).where(
+      and(
+        eq(deals.isActive, "true"),
+        lt(deals.endTime, date)
+      )
+    );
+  }
+
   async createDeal(insertDeal: InsertDeal): Promise<Deal> {
     const [deal] = await db
       .insert(deals)
@@ -73,6 +117,8 @@ export class DatabaseStorage implements IStorage {
         participants: insertDeal.participants ?? 0,
         specs: insertDeal.specs ?? [],
         isActive: insertDeal.isActive ?? "true",
+        status: insertDeal.status ?? "active",
+        minParticipants: insertDeal.minParticipants ?? 1,
       })
       .returning();
     return deal;
@@ -102,6 +148,11 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getParticipant(id: string): Promise<Participant | undefined> {
+    const [participant] = await db.select().from(participants).where(eq(participants.id, id));
+    return participant;
+  }
+
   async addParticipant(insertParticipant: InsertParticipant): Promise<Participant> {
     const [participant] = await db
       .insert(participants)
@@ -109,17 +160,36 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return participant;
   }
+
+  async updateParticipant(id: string, updates: Partial<InsertParticipant>): Promise<Participant | undefined> {
+    const [participant] = await db
+      .update(participants)
+      .set(updates)
+      .where(eq(participants.id, id))
+      .returning();
+    return participant;
+  }
+
+  async logEmail(log: Partial<EmailLog>): Promise<EmailLog> {
+    const [emailLog] = await db
+      .insert(emailLogs)
+      .values(log as any)
+      .returning();
+    return emailLog;
+  }
 }
 
 export class MemStorage implements IStorage {
   private usersMap: Map<string, User>;
   private dealsMap: Map<string, Deal>;
   private participantsMap: Map<string, Participant>;
+  private emailLogsMap: Map<string, EmailLog>;
 
   constructor() {
     this.usersMap = new Map();
     this.dealsMap = new Map();
     this.participantsMap = new Map();
+    this.emailLogsMap = new Map();
     this.seedDeals();
     this.seedParticipants();
   }
@@ -137,6 +207,7 @@ export class MemStorage implements IStorage {
         currentPrice: 6800,
         participants: 45,
         targetParticipants: 100,
+        minParticipants: 10,
         endTime: new Date(now.getTime() + 18 * 60 * 60 * 1000),
         tiers: [
           { minParticipants: 0, maxParticipants: 30, discount: 15, price: 7225 },
@@ -149,7 +220,9 @@ export class MemStorage implements IStorage {
           { label: "צבע", value: "נירוסטה" },
         ],
         isActive: "true",
+        status: "active",
         createdAt: now,
+        closedAt: null,
         supplierName: null,
         supplierStripeKey: null,
         supplierBankAccount: null,
@@ -165,6 +238,7 @@ export class MemStorage implements IStorage {
         currentPrice: 5625,
         participants: 78,
         targetParticipants: 100,
+        minParticipants: 15,
         endTime: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000),
         tiers: [
           { minParticipants: 0, maxParticipants: 40, discount: 20, price: 6000 },
@@ -177,7 +251,9 @@ export class MemStorage implements IStorage {
           { label: "טכנולוגיה", value: "OLED" },
         ],
         isActive: "true",
+        status: "active",
         createdAt: now,
+        closedAt: null,
         supplierName: null,
         supplierStripeKey: null,
         supplierBankAccount: null,
@@ -193,6 +269,7 @@ export class MemStorage implements IStorage {
         currentPrice: 3690,
         participants: 156,
         targetParticipants: 200,
+        minParticipants: 20,
         endTime: new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000),
         tiers: [
           { minParticipants: 0, maxParticipants: 50, discount: 12, price: 3960 },
@@ -205,7 +282,9 @@ export class MemStorage implements IStorage {
           { label: "דירוג אנרגטי", value: "A++" },
         ],
         isActive: "true",
+        status: "active",
         createdAt: now,
+        closedAt: null,
         supplierName: null,
         supplierStripeKey: null,
         supplierBankAccount: null,
@@ -221,6 +300,7 @@ export class MemStorage implements IStorage {
         currentPrice: 9600,
         participants: 23,
         targetParticipants: 50,
+        minParticipants: 10,
         endTime: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000),
         tiers: [
           { minParticipants: 0, maxParticipants: 20, discount: 15, price: 10200 },
@@ -233,7 +313,9 @@ export class MemStorage implements IStorage {
           { label: "צבע", value: "אפור" },
         ],
         isActive: "true",
+        status: "active",
         createdAt: now,
+        closedAt: null,
         supplierName: null,
         supplierStripeKey: null,
         supplierBankAccount: null,
@@ -249,6 +331,7 @@ export class MemStorage implements IStorage {
         currentPrice: 2520000,
         participants: 12,
         targetParticipants: 30,
+        minParticipants: 5,
         endTime: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
         tiers: [
           { minParticipants: 0, maxParticipants: 10, discount: 8, price: 2576000 },
@@ -261,7 +344,9 @@ export class MemStorage implements IStorage {
           { label: "קומה", value: "8" },
         ],
         isActive: "true",
+        status: "active",
         createdAt: now,
+        closedAt: null,
         supplierName: null,
         supplierStripeKey: null,
         supplierBankAccount: null,
@@ -277,6 +362,7 @@ export class MemStorage implements IStorage {
         currentPrice: 6800,
         participants: 34,
         targetParticipants: 60,
+        minParticipants: 10,
         endTime: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
         tiers: [
           { minParticipants: 0, maxParticipants: 25, discount: 15, price: 7225 },
@@ -289,7 +375,9 @@ export class MemStorage implements IStorage {
           { label: "מקומות", value: "8" },
         ],
         isActive: "true",
+        status: "active",
         createdAt: now,
+        closedAt: null,
         supplierName: null,
         supplierStripeKey: null,
         supplierBankAccount: null,
@@ -306,20 +394,41 @@ export class MemStorage implements IStorage {
     return this.usersMap.get(id);
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.usersMap.values()).find(u => u.email === email);
+  }
+
   async upsertUser(userData: UpsertUser): Promise<User> {
     const existing = userData.id ? this.usersMap.get(userData.id) : undefined;
     const user: User = {
       id: userData.id || randomUUID(),
-      email: userData.email ?? null,
+      email: userData.email ?? "",
+      passwordHash: userData.passwordHash ?? null,
       firstName: userData.firstName ?? null,
       lastName: userData.lastName ?? null,
+      phone: userData.phone ?? null,
       profileImageUrl: userData.profileImageUrl ?? null,
       isAdmin: userData.isAdmin ?? "false",
+      isEmailVerified: userData.isEmailVerified ?? "false",
+      emailVerificationToken: userData.emailVerificationToken ?? null,
+      emailVerificationExpires: userData.emailVerificationExpires ?? null,
+      passwordResetToken: userData.passwordResetToken ?? null,
+      passwordResetExpires: userData.passwordResetExpires ?? null,
+      stripeCustomerId: userData.stripeCustomerId ?? null,
       createdAt: existing?.createdAt ?? new Date(),
       updatedAt: new Date(),
     };
     this.usersMap.set(user.id, user);
     return user;
+  }
+
+  async updateUser(id: string, updates: Partial<UpsertUser>): Promise<User | undefined> {
+    const existing = this.usersMap.get(id);
+    if (!existing) return undefined;
+    
+    const updated: User = { ...existing, ...updates, updatedAt: new Date() };
+    this.usersMap.set(id, updated);
+    return updated;
   }
 
   async getDeals(): Promise<Deal[]> {
@@ -336,6 +445,12 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getActiveDealsClosingBefore(date: Date): Promise<Deal[]> {
+    return Array.from(this.dealsMap.values()).filter(
+      d => d.isActive === "true" && d.endTime < date
+    );
+  }
+
   async createDeal(insertDeal: InsertDeal): Promise<Deal> {
     const id = randomUUID();
     const deal: Deal = {
@@ -343,9 +458,12 @@ export class MemStorage implements IStorage {
       id,
       description: insertDeal.description ?? null,
       participants: insertDeal.participants ?? 0,
+      minParticipants: insertDeal.minParticipants ?? 1,
       specs: insertDeal.specs ?? [],
       isActive: insertDeal.isActive ?? "true",
+      status: insertDeal.status ?? "active",
       createdAt: new Date(),
+      closedAt: null,
       supplierName: insertDeal.supplierName ?? null,
       supplierStripeKey: insertDeal.supplierStripeKey ?? null,
       supplierBankAccount: insertDeal.supplierBankAccount ?? null,
@@ -411,9 +529,21 @@ export class MemStorage implements IStorage {
           dealId,
           userId: null,
           name: randomName,
+          email: null,
+          phone: null,
           pricePaid,
           position,
           joinedAt: joinTime,
+          paymentStatus: "card_validated",
+          stripePaymentIntentId: null,
+          stripeSetupIntentId: null,
+          stripePaymentMethodId: null,
+          cardLast4: null,
+          cardBrand: null,
+          chargedAt: null,
+          chargedAmount: null,
+          tierAtJoin: tierIndex,
+          finalTier: null,
         };
         
         this.participantsMap.set(participant.id, participant);
@@ -432,17 +562,62 @@ export class MemStorage implements IStorage {
       .filter(p => p.userId === userId);
   }
 
+  async getParticipant(id: string): Promise<Participant | undefined> {
+    return this.participantsMap.get(id);
+  }
+
   async addParticipant(insertParticipant: InsertParticipant): Promise<Participant> {
     const id = randomUUID();
     const participant: Participant = {
-      ...insertParticipant,
       id,
+      dealId: insertParticipant.dealId,
       userId: insertParticipant.userId ?? null,
+      name: insertParticipant.name,
+      email: insertParticipant.email ?? null,
+      phone: insertParticipant.phone ?? null,
+      pricePaid: insertParticipant.pricePaid,
+      position: insertParticipant.position,
       joinedAt: new Date(),
+      paymentStatus: insertParticipant.paymentStatus ?? "pending",
+      stripePaymentIntentId: insertParticipant.stripePaymentIntentId ?? null,
+      stripeSetupIntentId: insertParticipant.stripeSetupIntentId ?? null,
+      stripePaymentMethodId: insertParticipant.stripePaymentMethodId ?? null,
+      cardLast4: insertParticipant.cardLast4 ?? null,
+      cardBrand: insertParticipant.cardBrand ?? null,
+      chargedAt: null,
+      chargedAmount: insertParticipant.chargedAmount ?? null,
+      tierAtJoin: insertParticipant.tierAtJoin ?? null,
+      finalTier: insertParticipant.finalTier ?? null,
     };
     this.participantsMap.set(id, participant);
     return participant;
   }
+
+  async updateParticipant(id: string, updates: Partial<InsertParticipant>): Promise<Participant | undefined> {
+    const existing = this.participantsMap.get(id);
+    if (!existing) return undefined;
+    
+    const updated: Participant = { ...existing, ...updates };
+    this.participantsMap.set(id, updated);
+    return updated;
+  }
+
+  async logEmail(log: Partial<EmailLog>): Promise<EmailLog> {
+    const id = randomUUID();
+    const emailLog: EmailLog = {
+      id,
+      userId: log.userId ?? null,
+      dealId: log.dealId ?? null,
+      emailType: log.emailType || "unknown",
+      recipientEmail: log.recipientEmail || "",
+      subject: log.subject ?? null,
+      status: log.status ?? "sent",
+      sentAt: log.sentAt ?? new Date(),
+      errorMessage: log.errorMessage ?? null,
+    };
+    this.emailLogsMap.set(id, emailLog);
+    return emailLog;
+  }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

@@ -12,6 +12,14 @@ DealRush is a group-buying e-commerce platform where prices dynamically decrease
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+**December 2024**:
+- Replaced Replit Auth with custom email/password authentication system
+- Integrated Stripe for payment processing with card validation before joining deals
+- Updated participants table to track payment status and Stripe payment method IDs
+- Added card validation requirement before users can join deals
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -32,7 +40,6 @@ Preferred communication style: Simple, everyday language.
 
 **Key Frontend Patterns**:
 - Component-driven architecture with reusable UI primitives
-- Mock data implementations (marked with "todo: remove mock functionality") for frontend-first development
 - Position-based pricing calculations handled client-side via utility functions
 - Real-time countdown timers with visual urgency indicators
 
@@ -46,14 +53,15 @@ Preferred communication style: Simple, everyday language.
 
 **Static File Serving**: Production builds serve static files from `dist/public` directory with SPA fallback to `index.html`.
 
-**Storage Interface**: Abstracted storage layer (`IStorage` interface) with in-memory implementation (`MemStorage`). Includes CRUD operations for deals and users. Designed to be swapped with database implementations without changing business logic.
+**Storage Interface**: DatabaseStorage implementation using Drizzle ORM with PostgreSQL for persistent data storage.
 
 **API Endpoints**:
 - GET `/api/deals` - List all active deals
 - GET `/api/deals/:id` - Get single deal by ID
-- POST `/api/deals` - Create new deal
-- PATCH `/api/deals/:id` - Update existing deal
-- DELETE `/api/deals/:id` - Delete deal
+- POST `/api/deals` - Create new deal (admin only)
+- PATCH `/api/deals/:id` - Update existing deal (admin only)
+- DELETE `/api/deals/:id` - Delete deal (admin only)
+- POST `/api/deals/:id/join` - Join a deal (requires authentication and card validation)
 - POST `/api/upload` - Upload images (multer middleware)
 
 **Build System**: Custom esbuild configuration that bundles server code with selective dependency bundling (allowlist approach) to optimize cold start times.
@@ -62,7 +70,16 @@ Preferred communication style: Simple, everyday language.
 
 **Database ORM**: Drizzle ORM configured for PostgreSQL (via `@neondatabase/serverless`).
 
-**Schema Design**: Includes users and deals tables. Schema definitions use Drizzle's pg-core with Zod validation via `drizzle-zod`.
+**Schema Design**: Includes users, deals, and participants tables. Schema definitions use Drizzle's pg-core with Zod validation via `drizzle-zod`.
+
+**Users Schema** (`shared/schema.ts`):
+- id, email, passwordHash (bcrypt hashed)
+- firstName, lastName, phone
+- isEmailVerified, emailVerificationToken, emailVerificationExpires
+- passwordResetToken, passwordResetExpires
+- stripeCustomerId
+- isAdmin, profileImageUrl
+- createdAt, updatedAt
 
 **Deals Schema** (`shared/schema.ts`):
 - id, name, description, category
@@ -71,22 +88,23 @@ Preferred communication style: Simple, everyday language.
 - endTime (timestamp)
 - tiers (JSON array with minParticipants, maxParticipants, discount, price)
 - specs (JSON array of label/value pairs)
-- isActive, createdAt
-
-**Categories**: apartments, electrical, furniture, electronics, home, fashion
-
-**Migration Strategy**: Drizzle Kit for schema migrations, output to `./migrations` directory.
-
-**Data Validation**: Zod schemas for runtime validation, co-located with Drizzle table definitions for type safety.
+- isActive, status, minParticipants
+- createdAt
 
 **Participants Schema** (`shared/schema.ts`):
 - id, dealId, name, pricePaid, position, joinedAt
+- userId, email, phone
+- paymentStatus (pending, card_validated, charged, failed, refunded, cancelled)
+- stripePaymentIntentId, stripeSetupIntentId, stripePaymentMethodId
+- cardLast4, cardBrand, tierAtJoin
 - Position determines price within tier (±2.5% variance)
 - Privacy: UI displays initials only (e.g., "ד.ל." instead of full name)
 
-**Future Schema Needs**:
-- Orders/Transactions table
-- Price history for tier tracking
+**Categories**: apartments, electrical, furniture, electronics, home, fashion
+
+**Migration Strategy**: Drizzle Kit for schema migrations, using `npm run db:push` to sync schema changes.
+
+**Data Validation**: Zod schemas for runtime validation, co-located with Drizzle table definitions for type safety.
 
 ### Design System & UI Patterns
 
@@ -109,6 +127,7 @@ Preferred communication style: Simple, everyday language.
 - **ActivityFeed**: Real-time social proof of other users joining
 - **AdminPage**: Full CRUD management for deals with forms for images, pricing, and tiers
 - **ParticipantsList**: Shows all deal participants with privacy-protected initials, individual prices, and position-based discounts
+- **AuthModal**: Login/Register modal with email/password authentication
 
 **Deal Detail Layout** (RTL):
 - Right side: Product title, description, pricing, countdown timer, join button
@@ -127,6 +146,61 @@ Preferred communication style: Simple, everyday language.
 - Supports percentage discounts or absolute prices
 - Current participant count determines active tier
 - Next tier unlocked when participant threshold reached
+
+### Authentication System
+
+**Implementation**: Custom email/password authentication with bcrypt password hashing
+
+**Key Files**:
+- `server/auth.ts` - Password hashing, verification, token generation
+- `server/routes.ts` - Auth API endpoints
+- `client/src/hooks/useAuth.ts` - React hook for auth state
+- `client/src/components/AuthModal.tsx` - Login/Register UI
+
+**Auth Endpoints**:
+- POST `/api/auth/register` - Register new user with email/password
+- POST `/api/auth/login` - Login with email/password
+- POST `/api/auth/logout` - Logout user
+- GET `/api/auth/user` - Returns current user (protected)
+- POST `/api/auth/verify-email` - Verify email with token
+- POST `/api/auth/resend-verification` - Resend verification email
+- POST `/api/auth/forgot-password` - Request password reset
+- POST `/api/auth/reset-password` - Reset password with token
+- GET `/api/user/purchases` - User purchase history (protected)
+
+**Session Configuration**:
+- MemoryStore-backed sessions for development
+- Secure cookie flag based on NODE_ENV
+- 7-day session expiration
+
+**Password Security**:
+- bcrypt hashing with 12 salt rounds
+- Minimum 8 character requirement
+- Email verification tokens expire in 24 hours
+- Password reset tokens expire in 1 hour
+
+### Payment System
+
+**Implementation**: Stripe integration for card validation and payment processing
+
+**Key Files**:
+- `server/stripeClient.ts` - Stripe client initialization and credentials
+- `server/stripeService.ts` - Stripe operations (customers, payments, cards)
+- `server/webhookHandlers.ts` - Stripe webhook processing
+
+**Stripe Endpoints**:
+- GET `/api/stripe/publishable-key` - Get Stripe publishable key for frontend
+- POST `/api/stripe/create-setup-intent` - Create setup intent for card saving
+- POST `/api/stripe/validate-card` - Validate a payment method
+- POST `/api/stripe/attach-payment-method` - Attach card to customer
+- GET `/api/stripe/payment-methods` - List user's saved payment methods
+
+**Payment Flow**:
+1. User adds card via Stripe Elements (saved with Setup Intent)
+2. Card is validated before user can join a deal
+3. Payment is held until deal closes
+4. When deal closes successfully, all participants are charged
+5. If deal doesn't reach minimum, participants are notified (no charge)
 
 ## External Dependencies
 
@@ -156,9 +230,9 @@ Preferred communication style: Simple, everyday language.
 - Drizzle ORM v0.39
 - @neondatabase/serverless for PostgreSQL connection
 - Zod for validation
-- connect-pg-simple for PostgreSQL session storage
-- openid-client for Replit Auth OAuth2/OIDC
-- passport and passport-local for authentication middleware
+- bcrypt for password hashing
+- Stripe for payment processing
+- stripe-replit-sync for Stripe data sync
 
 ### Build Tools & Development
 
@@ -180,34 +254,8 @@ Preferred communication style: Simple, everyday language.
 - Configured through `DATABASE_URL` environment variable
 - Drizzle Kit for schema management and migrations
 
-### Authentication System
+### Email Service
 
-**Implementation**: Replit Auth with OpenID Connect (OAuth 2.0)
-- Supports Google, GitHub, Apple, and email/password authentication
-- Uses PostgreSQL session storage via connect-pg-simple
-- Protocol-aware strategy caching for mixed HTTP/HTTPS deployments
-- Strategy names include protocol: `replitauth:${protocol}:${domain}`
-
-**Key Files**:
-- `server/replitAuth.ts` - Passport OIDC strategy configuration
-- `client/src/hooks/useAuth.ts` - React hook for auth state
-- `client/src/lib/authUtils.ts` - Auth utility functions
-
-**Auth Endpoints**:
-- GET `/api/login` - Initiates OAuth flow
-- GET `/api/callback` - OAuth callback handler
-- GET `/api/logout` - Logs out user
-- GET `/api/auth/user` - Returns current user (protected)
-- GET `/api/user/purchases` - User purchase history (protected)
-
-**Session Configuration**:
-- PostgreSQL-backed sessions (connect-pg-simple)
-- Secure cookie flag based on NODE_ENV
-- 7-day session expiration
-
-### Future Integration Points
-
-Based on checkout and payment flows in components:
-- Payment processor integration needed (Stripe dependencies present)
-- Email service for notifications (nodemailer present)
-- File upload handling (multer present)
+**Provider**: Gmail API via Google OAuth2
+- Sends verification emails, password reset emails
+- Deal notifications (join confirmation, tier unlocks, deal closure)

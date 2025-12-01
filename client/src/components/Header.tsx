@@ -13,6 +13,7 @@ interface HeaderProps {
   user?: UserType | null;
   notificationCount?: number;
   onLogin?: () => void;
+  onRegister?: () => void;
   onLogout?: () => void;
 }
 
@@ -22,6 +23,7 @@ export default function Header({
   user,
   notificationCount = 0,
   onLogin,
+  onRegister,
   onLogout 
 }: HeaderProps) {
   const [location] = useLocation();
@@ -124,7 +126,7 @@ export default function Header({
               </Button>
               <Button 
                 size="sm" 
-                onClick={onLogin}
+                onClick={onRegister}
                 data-testid="button-register"
               >
                 הרשמה
@@ -198,7 +200,7 @@ export default function Header({
                       <Button 
                         className="w-full"
                         onClick={() => {
-                          onLogin?.();
+                          onRegister?.();
                           setMobileMenuOpen(false);
                         }}
                       >
