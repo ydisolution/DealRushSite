@@ -9,7 +9,7 @@ export default function CheckoutPage() {
   const [, setLocation] = useLocation();
 
   const { data: deal, isLoading } = useQuery<Deal>({
-    queryKey: [`/api/deals/${id}`],
+    queryKey: ["/api/deals", id],
     enabled: !!id,
   });
 

@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
+import { format } from "date-fns";
+import { he } from "date-fns/locale";
 
 interface CircularCountdownTimerProps {
   endTime: Date | string;
   size?: "sm" | "md" | "lg";
   showLabels?: boolean;
+  showEndDate?: boolean;
   onExpire?: () => void;
 }
 
@@ -21,6 +24,7 @@ export default function CircularCountdownTimer({
   endTime: endTimeProp, 
   size = "md",
   showLabels = true,
+  showEndDate = false,
   onExpire 
 }: CircularCountdownTimerProps) {
   const endTime = useMemo(() => {
@@ -79,12 +83,12 @@ export default function CircularCountdownTimer({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [endTime, onExpire]);
+  }, [endTime, onExpire, initialDuration]);
 
   const sizeConfig = {
-    sm: { diameter: 80, strokeWidth: 6, fontSize: "text-xs", labelSize: "text-[9px]" },
-    md: { diameter: 120, strokeWidth: 8, fontSize: "text-base", labelSize: "text-[10px]" },
-    lg: { diameter: 160, strokeWidth: 10, fontSize: "text-xl", labelSize: "text-xs" },
+    sm: { diameter: 100, strokeWidth: 6, fontSize: "text-xs", labelSize: "text-[8px]", unitSize: "text-[10px]" },
+    md: { diameter: 140, strokeWidth: 8, fontSize: "text-sm", labelSize: "text-[9px]", unitSize: "text-xs" },
+    lg: { diameter: 180, strokeWidth: 10, fontSize: "text-base", labelSize: "text-[10px]", unitSize: "text-sm" },
   };
 
   const config = sizeConfig[size];
@@ -98,99 +102,119 @@ export default function CircularCountdownTimer({
       bg: "stroke-emerald-500/20",
       text: "text-emerald-600 dark:text-emerald-400",
       glow: "drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]",
+      unitBg: "bg-emerald-500/10",
     },
     warning: {
       stroke: "stroke-amber-500",
       bg: "stroke-amber-500/20",
       text: "text-amber-600 dark:text-amber-400",
       glow: "drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]",
+      unitBg: "bg-amber-500/10",
     },
     urgent: {
       stroke: "stroke-orange-500",
       bg: "stroke-orange-500/20",
       text: "text-orange-600 dark:text-orange-400",
       glow: "drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]",
+      unitBg: "bg-orange-500/10",
     },
     critical: {
       stroke: "stroke-red-500",
       bg: "stroke-red-500/20",
       text: "text-red-600 dark:text-red-400",
       glow: "drop-shadow-[0_0_12px_rgba(239,68,68,0.7)]",
+      unitBg: "bg-red-500/10",
     },
   };
 
   const colors = statusColors[status];
   const isBlinking = status === "critical";
 
-  const formatTimeDisplay = () => {
-    if (timeLeft.days > 0) {
-      return (
-        <div className="flex flex-col items-center">
-          <span className={`${config.fontSize} font-bold ${colors.text}`}>
-            {timeLeft.days}:{String(timeLeft.hours).padStart(2, "0")}
-          </span>
-          {showLabels && (
-            <span className={`${config.labelSize} text-muted-foreground`}>ימים:שעות</span>
-          )}
-        </div>
-      );
+  const formattedEndDate = useMemo(() => {
+    try {
+      return format(endTime, "dd/MM/yyyy בשעה HH:mm", { locale: he });
+    } catch {
+      return "";
     }
-    
-    return (
-      <div className="flex flex-col items-center">
-        <span className={`${config.fontSize} font-bold ${colors.text}`}>
-          {String(timeLeft.hours).padStart(2, "0")}:{String(timeLeft.minutes).padStart(2, "0")}
-        </span>
-        {showLabels && (
-          <span className={`${config.labelSize} text-muted-foreground`}>
-            {timeLeft.hours > 0 ? "שעות:דקות" : "דקות:שניות"}
-          </span>
-        )}
-        {timeLeft.hours === 0 && (
-          <span className={`${config.labelSize} font-semibold ${colors.text} mt-0.5`}>
-            :{String(timeLeft.seconds).padStart(2, "0")}
-          </span>
-        )}
-      </div>
-    );
-  };
+  }, [endTime]);
 
   return (
-    <div 
-      className={`relative inline-flex items-center justify-center ${isBlinking ? "animate-pulse" : ""}`}
-      style={{ width: config.diameter, height: config.diameter }}
-      data-testid="circular-countdown-timer"
-    >
-      <svg
-        className={`transform -rotate-90 ${colors.glow}`}
-        width={config.diameter}
-        height={config.diameter}
+    <div className="flex flex-col items-center gap-2" data-testid="circular-countdown-timer">
+      <div 
+        className={`relative inline-flex items-center justify-center ${isBlinking ? "animate-pulse" : ""}`}
+        style={{ width: config.diameter, height: config.diameter }}
       >
-        <circle
-          className={colors.bg}
-          strokeWidth={config.strokeWidth}
-          stroke="currentColor"
-          fill="transparent"
-          r={radius}
-          cx={config.diameter / 2}
-          cy={config.diameter / 2}
-        />
-        <circle
-          className={`${colors.stroke} transition-all duration-1000 ease-linear`}
-          strokeWidth={config.strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-          stroke="currentColor"
-          fill="transparent"
-          r={radius}
-          cx={config.diameter / 2}
-          cy={config.diameter / 2}
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center" dir="ltr">
-        {formatTimeDisplay()}
+        <svg
+          className={`transform -rotate-90 ${colors.glow}`}
+          width={config.diameter}
+          height={config.diameter}
+        >
+          <circle
+            className={colors.bg}
+            strokeWidth={config.strokeWidth}
+            stroke="currentColor"
+            fill="transparent"
+            r={radius}
+            cx={config.diameter / 2}
+            cy={config.diameter / 2}
+          />
+          <circle
+            className={`${colors.stroke} transition-all duration-1000 ease-linear`}
+            strokeWidth={config.strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            stroke="currentColor"
+            fill="transparent"
+            r={radius}
+            cx={config.diameter / 2}
+            cy={config.diameter / 2}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center" dir="rtl">
+          <div className="grid grid-cols-2 gap-1 text-center">
+            <div className={`flex flex-col items-center px-1 py-0.5 rounded ${colors.unitBg}`}>
+              <span className={`${config.fontSize} font-bold ${colors.text} tabular-nums`}>
+                {String(timeLeft.days).padStart(2, "0")}
+              </span>
+              {showLabels && (
+                <span className={`${config.labelSize} text-muted-foreground`}>ימים</span>
+              )}
+            </div>
+            <div className={`flex flex-col items-center px-1 py-0.5 rounded ${colors.unitBg}`}>
+              <span className={`${config.fontSize} font-bold ${colors.text} tabular-nums`}>
+                {String(timeLeft.hours).padStart(2, "0")}
+              </span>
+              {showLabels && (
+                <span className={`${config.labelSize} text-muted-foreground`}>שעות</span>
+              )}
+            </div>
+            <div className={`flex flex-col items-center px-1 py-0.5 rounded ${colors.unitBg}`}>
+              <span className={`${config.fontSize} font-bold ${colors.text} tabular-nums`}>
+                {String(timeLeft.minutes).padStart(2, "0")}
+              </span>
+              {showLabels && (
+                <span className={`${config.labelSize} text-muted-foreground`}>דקות</span>
+              )}
+            </div>
+            <div className={`flex flex-col items-center px-1 py-0.5 rounded ${colors.unitBg}`}>
+              <span className={`${config.fontSize} font-bold ${colors.text} tabular-nums`}>
+                {String(timeLeft.seconds).padStart(2, "0")}
+              </span>
+              {showLabels && (
+                <span className={`${config.labelSize} text-muted-foreground`}>שניות</span>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
+      
+      {showEndDate && formattedEndDate && (
+        <div className={`${config.unitSize} text-muted-foreground text-center`} dir="rtl">
+          <span>נסגר ב-</span>
+          <span className="font-medium">{formattedEndDate}</span>
+        </div>
+      )}
     </div>
   );
 }

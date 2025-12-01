@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import DealDetail from "@/components/DealDetail";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/useAuth";
 import type { Deal } from "@shared/schema";
 
 interface DealPageProps {
@@ -35,6 +36,7 @@ function LoadingSkeleton() {
 export default function DealPage({ onOpenAuth }: DealPageProps) {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const { isAuthenticated } = useAuth();
 
   const { data: deal, isLoading, error } = useQuery<Deal>({
     queryKey: ["/api/deals", id],
@@ -87,13 +89,19 @@ export default function DealPage({ onOpenAuth }: DealPageProps) {
     { id: "5", type: "join" as const, userName: "אבי ל.", timestamp: new Date(Date.now() - 20 * 60 * 1000) },
   ];
 
+  const handleJoinDeal = () => {
+    if (isAuthenticated) {
+      setLocation(`/checkout/${id}`);
+    } else {
+      onOpenAuth?.();
+    }
+  };
+
   return (
     <DealDetail 
       deal={transformedDeal}
       activities={mockActivities}
-      onJoin={() => {
-        onOpenAuth?.();
-      }}
+      onJoin={handleJoinDeal}
       onBack={() => setLocation('/')}
     />
   );

@@ -169,7 +169,7 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
                   הדיל נסגר בעוד:
                 </div>
                 <div className="flex justify-center">
-                  <CircularCountdownTimer endTime={endTime} size="lg" />
+                  <CircularCountdownTimer endTime={endTime} size="lg" showEndDate={true} />
                 </div>
               </CardContent>
             </Card>

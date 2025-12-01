@@ -7,6 +7,7 @@ import HowItWorks from "@/components/HowItWorks";
 import TrustBadges from "@/components/TrustBadges";
 import Categories from "@/components/Categories";
 import SearchFilter from "@/components/SearchFilter";
+import { useAuth } from "@/hooks/useAuth";
 import type { Deal } from "@shared/schema";
 
 interface HomeProps {
@@ -15,6 +16,7 @@ interface HomeProps {
 
 export default function Home({ onOpenAuth }: HomeProps) {
   const [, setLocation] = useLocation();
+  const { isAuthenticated } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState("");
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 3000000]);
@@ -70,7 +72,11 @@ export default function Home({ onOpenAuth }: HomeProps) {
   };
 
   const handleJoinDeal = (dealId: string) => {
-    onOpenAuth?.();
+    if (isAuthenticated) {
+      setLocation(`/checkout/${dealId}`);
+    } else {
+      onOpenAuth?.();
+    }
   };
 
   return (

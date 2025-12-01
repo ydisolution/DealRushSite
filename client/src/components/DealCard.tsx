@@ -85,7 +85,7 @@ export default function DealCard({ deal, onJoin, onView }: DealCardProps) {
         </h3>
 
         <div className="bg-muted/50 rounded-lg p-3">
-          <CountdownTimer endTime={endTime} size="sm" centered showLabels={false} />
+          <CountdownTimer endTime={endTime} size="sm" centered showLabels={true} showEndDate={true} />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
