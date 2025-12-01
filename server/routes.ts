@@ -57,8 +57,22 @@ export async function registerRoutes(
 
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const claims = req.user.claims;
+      const userId = claims.sub;
+      let user = await storage.getUser(userId);
+      
+      if (!user) {
+        const isAdminEmail = claims.email === "ydisolution@gmail.com";
+        user = await storage.upsertUser({
+          id: userId,
+          email: claims.email,
+          firstName: claims.first_name,
+          lastName: claims.last_name,
+          profileImageUrl: claims.profile_image_url,
+          isAdmin: isAdminEmail ? "true" : "false",
+        });
+      }
+      
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
