@@ -7,10 +7,13 @@ export function useAuth() {
     retry: false,
   });
 
+  const isAdmin = user?.isAdmin === "true";
+
   return {
     user,
     isLoading,
     isAuthenticated: !!user,
+    isAdmin,
     error,
   };
 }

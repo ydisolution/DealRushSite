@@ -314,6 +314,7 @@ export class MemStorage implements IStorage {
       firstName: userData.firstName ?? null,
       lastName: userData.lastName ?? null,
       profileImageUrl: userData.profileImageUrl ?? null,
+      isAdmin: userData.isAdmin ?? "false",
       createdAt: existing?.createdAt ?? new Date(),
       updatedAt: new Date(),
     };

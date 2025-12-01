@@ -69,7 +69,7 @@ const dealFormSchema = z.object({
 type DealFormData = z.infer<typeof dealFormSchema>;
 
 export default function AdminPage() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isAdmin, isLoading } = useAuth();
   const [, setLocation] = useLocation();
 
   if (isLoading) {
@@ -80,15 +80,15 @@ export default function AdminPage() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !isAdmin) {
     return (
       <div className="container mx-auto px-4 py-8 text-center" dir="rtl">
         <div className="max-w-md mx-auto">
           <AlertCircle className="w-16 h-16 mx-auto mb-4 text-destructive" />
           <h1 className="text-2xl font-bold mb-4">גישה נדחתה</h1>
-          <p className="text-muted-foreground mb-6">עליך להיות מחובר כדי לגשת לדף הניהול</p>
-          <Button onClick={() => window.location.href = '/api/login'}>
-            התחברות
+          <p className="text-muted-foreground mb-6">רק מנהלים יכולים לגשת לדף זה</p>
+          <Button onClick={() => setLocation('/')}>
+            חזרה לדף הבית
           </Button>
         </div>
       </div>

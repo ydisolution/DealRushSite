@@ -54,12 +54,14 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
+  const isAdminEmail = claims["email"] === "ydisolution@gmail.com";
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
+    isAdmin: isAdminEmail ? "true" : "false",
   });
 }
 
