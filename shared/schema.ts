@@ -33,6 +33,7 @@ export const tierSchema = z.object({
   maxParticipants: z.number().min(1),
   discount: z.number().min(0).max(100),
   price: z.number().optional(),
+  commission: z.number().min(0).max(100).optional(),
 });
 
 export type Tier = z.infer<typeof tierSchema>;
@@ -52,6 +53,10 @@ export const deals = pgTable("deals", {
   specs: jsonb("specs").$type<Array<{ label: string; value: string }>>().default([]),
   isActive: text("is_active").notNull().default("true"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  supplierName: text("supplier_name"),
+  supplierStripeKey: text("supplier_stripe_key"),
+  supplierBankAccount: text("supplier_bank_account"),
+  platformCommission: integer("platform_commission").default(5),
 });
 
 export const insertDealSchema = createInsertSchema(deals).omit({

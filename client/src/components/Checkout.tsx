@@ -12,7 +12,10 @@ import {
   RefreshCcw, 
   CheckCircle,
   ChevronRight,
-  TrendingDown
+  TrendingDown,
+  Building,
+  Shield,
+  Flame
 } from "lucide-react";
 
 interface CheckoutProps {
@@ -23,6 +26,18 @@ interface CheckoutProps {
     originalPrice: number;
     currentPrice: number;
     endTime: Date;
+    participants?: number;
+    targetParticipants?: number;
+    supplierName?: string | null;
+    supplierStripeKey?: string | null;
+    tiers?: Array<{
+      minParticipants: number;
+      maxParticipants: number;
+      price?: number;
+      discount: number;
+      commission?: number;
+    }>;
+    platformCommission?: number | null;
   };
   onBack?: () => void;
   onComplete?: (orderId: string) => void;
@@ -374,7 +389,21 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
                   <span className="text-xl font-bold text-primary">₪{deal.currentPrice.toLocaleString()}</span>
                 </div>
 
+                {deal.supplierName && (
+                  <div className="pt-4 border-t">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Building className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">ספק:</span>
+                      <span className="font-medium">{deal.supplierName}</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2 pt-4 border-t text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-3.5 w-3.5 text-primary" />
+                    <span>תשלום מאובטח ישירות לספק</span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <Lock className="h-3.5 w-3.5 text-primary" />
                     <span>המחיר נעול - זה המחיר המקסימלי</span>
@@ -388,6 +417,35 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
                     <span>החזר כספי מלא עד 14 ימים</span>
                   </div>
                 </div>
+
+                {deal.participants && deal.targetParticipants && deal.tiers && deal.tiers.length > 0 && (
+                  (() => {
+                    const sortedTiers = [...deal.tiers].sort((a, b) => a.minParticipants - b.minParticipants);
+                    const currentTierIndex = sortedTiers.findIndex(t => 
+                      deal.participants! >= t.minParticipants && deal.participants! <= t.maxParticipants
+                    );
+                    
+                    if (currentTierIndex >= 0 && currentTierIndex < sortedTiers.length - 1) {
+                      const nextTier = sortedTiers[currentTierIndex + 1];
+                      const participantsNeeded = nextTier.minParticipants - deal.participants!;
+                      
+                      if (participantsNeeded > 0) {
+                        const nextPrice = nextTier.price || Math.round(deal.originalPrice * (1 - nextTier.discount / 100));
+                        return (
+                          <div className="pt-4 border-t">
+                            <div className="flex items-center gap-2 p-2 bg-urgent/10 rounded-md text-xs">
+                              <Flame className="h-4 w-4 text-urgent" />
+                              <span>
+                                עוד <strong>{participantsNeeded}</strong> אנשים ל-₪{nextPrice.toLocaleString()}!
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+                    }
+                    return null;
+                  })()
+                )}
               </CardContent>
             </Card>
           </div>

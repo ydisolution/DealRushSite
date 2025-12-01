@@ -1,47 +1,64 @@
 import { useLocation, useParams } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import Checkout from "@/components/Checkout";
-
-import acImage from '@assets/generated_images/lg_inverter_air_conditioner.png';
-import tvImage from '@assets/generated_images/samsung_65_inch_tv.png';
-import headphonesImage from '@assets/generated_images/sony_wireless_headphones.png';
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Deal } from "@shared/schema";
 
 export default function CheckoutPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
 
-  // todo: remove mock functionality
-  const mockDeals: Record<string, any> = {
-    "deal-1": {
-      id: "deal-1",
-      name: "מזגן LG Inverter 12,000 BTU",
-      image: acImage,
-      originalPrice: 4500,
-      currentPrice: 3690,
-      endTime: new Date(Date.now() + 18 * 60 * 60 * 1000),
-    },
-    "deal-2": {
-      id: "deal-2",
-      name: "טלוויזיה Samsung QLED 65 אינץ'",
-      image: tvImage,
-      originalPrice: 6500,
-      currentPrice: 4875,
-      endTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-    },
-    "deal-3": {
-      id: "deal-3",
-      name: "אוזניות Sony WH-1000XM5",
-      image: headphonesImage,
-      originalPrice: 1400,
-      currentPrice: 890,
-      endTime: new Date(Date.now() + 5 * 60 * 60 * 1000),
-    },
-  };
+  const { data: deal, isLoading } = useQuery<Deal>({
+    queryKey: [`/api/deals/${id}`],
+    enabled: !!id,
+  });
 
-  const deal = mockDeals[id || "deal-1"] || mockDeals["deal-1"];
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Skeleton className="h-8 w-32 mb-6" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <Skeleton className="h-96 w-full" />
+          </div>
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!deal) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <h1 className="text-2xl font-bold mb-4">הדיל לא נמצא</h1>
+        <button 
+          onClick={() => setLocation("/")}
+          className="text-primary hover:underline"
+        >
+          חזרה לדף הבית
+        </button>
+      </div>
+    );
+  }
+
+  const checkoutDeal = {
+    id: deal.id,
+    name: deal.name,
+    image: deal.images[0] || "",
+    originalPrice: deal.originalPrice,
+    currentPrice: deal.currentPrice,
+    endTime: new Date(deal.endTime),
+    participants: deal.participants,
+    targetParticipants: deal.targetParticipants,
+    supplierName: deal.supplierName,
+    supplierStripeKey: deal.supplierStripeKey,
+    tiers: deal.tiers,
+    platformCommission: deal.platformCommission,
+  };
 
   return (
     <Checkout 
-      deal={deal}
+      deal={checkoutDeal}
       onBack={() => setLocation(`/deal/${id}`)}
       onComplete={() => setLocation('/dashboard')}
     />

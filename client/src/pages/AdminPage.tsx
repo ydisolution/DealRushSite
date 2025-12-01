@@ -28,7 +28,10 @@ import {
   Layers,
   X,
   Check,
-  AlertCircle
+  AlertCircle,
+  CreditCard,
+  Building,
+  Receipt
 } from "lucide-react";
 import type { Deal } from "@shared/schema";
 import { CATEGORIES } from "@shared/schema";
@@ -38,6 +41,7 @@ const tierSchema = z.object({
   maxParticipants: z.number().min(1),
   discount: z.number().min(0).max(100),
   price: z.number().optional(),
+  commission: z.number().min(0).max(100).optional(),
 });
 
 const dealFormSchema = z.object({
@@ -54,6 +58,10 @@ const dealFormSchema = z.object({
     label: z.string(),
     value: z.string(),
   })).optional(),
+  supplierName: z.string().optional(),
+  supplierStripeKey: z.string().optional(),
+  supplierBankAccount: z.string().optional(),
+  platformCommission: z.number().min(0).max(100).optional(),
 });
 
 type DealFormData = z.infer<typeof dealFormSchema>;
@@ -72,9 +80,9 @@ function DealForm({
   const [imageUrls, setImageUrls] = useState<string[]>(deal?.images || []);
 
   const defaultTiers = deal?.tiers || [
-    { minParticipants: 0, maxParticipants: 30, discount: 10 },
-    { minParticipants: 31, maxParticipants: 60, discount: 15 },
-    { minParticipants: 61, maxParticipants: 100, discount: 20 },
+    { minParticipants: 0, maxParticipants: 30, discount: 10, commission: 5 },
+    { minParticipants: 31, maxParticipants: 60, discount: 15, commission: 5 },
+    { minParticipants: 61, maxParticipants: 100, discount: 20, commission: 5 },
   ];
 
   const form = useForm<DealFormData>({
@@ -90,6 +98,10 @@ function DealForm({
       images: deal?.images || [],
       tiers: defaultTiers,
       specs: deal?.specs || [],
+      supplierName: deal?.supplierName || "",
+      supplierStripeKey: deal?.supplierStripeKey || "",
+      supplierBankAccount: deal?.supplierBankAccount || "",
+      platformCommission: deal?.platformCommission || 5,
     },
   });
 
@@ -340,7 +352,7 @@ function DealForm({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => appendTier({ minParticipants: 0, maxParticipants: 10, discount: 5 })}
+            onClick={() => appendTier({ minParticipants: 0, maxParticipants: 10, discount: 5, commission: 5 })}
             data-testid="button-add-tier"
           >
             <Plus className="h-4 w-4 ml-1" />
@@ -356,7 +368,7 @@ function DealForm({
                   מדרגה {index + 1}
                 </Badge>
                 
-                <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">מינימום משתתפים</Label>
                     <Input
@@ -381,6 +393,19 @@ function DealForm({
                         {...form.register(`tiers.${index}.discount`, { valueAsNumber: true })}
                         className="pl-8"
                         data-testid={`input-tier-discount-${index}`}
+                      />
+                      <Percent className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">עמלה לאתר %</Label>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        {...form.register(`tiers.${index}.commission`, { valueAsNumber: true })}
+                        className="pl-8"
+                        placeholder="5"
+                        data-testid={`input-tier-commission-${index}`}
                       />
                       <Percent className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     </div>
@@ -460,6 +485,76 @@ function DealForm({
             ))}
           </div>
         )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Building className="h-5 w-5 text-muted-foreground" />
+          <h3 className="font-semibold">פרטי ספק וסליקה</h3>
+        </div>
+        
+        <Card className="p-4 bg-accent/30 border-accent">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="supplierName">שם הספק</Label>
+              <Input
+                id="supplierName"
+                {...form.register("supplierName")}
+                placeholder="שם החברה או העסק"
+                data-testid="input-supplier-name"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="platformCommission">עמלת פלטפורמה כללית (%)</Label>
+              <div className="relative">
+                <Input
+                  id="platformCommission"
+                  type="number"
+                  {...form.register("platformCommission", { valueAsNumber: true })}
+                  placeholder="5"
+                  className="pl-8"
+                  data-testid="input-platform-commission"
+                />
+                <Percent className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-xs text-muted-foreground">עמלה זו תחול על כל המדרגות אם לא הוגדרה עמלה ספציפית</p>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="supplierStripeKey" className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                מפתח Stripe של הספק (Secret Key)
+              </Label>
+              <Input
+                id="supplierStripeKey"
+                type="password"
+                {...form.register("supplierStripeKey")}
+                placeholder="sk_live_..."
+                data-testid="input-supplier-stripe"
+              />
+              <p className="text-xs text-muted-foreground">התשלום יועבר ישירות לחשבון הספק</p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="supplierBankAccount" className="flex items-center gap-2">
+                <Receipt className="h-4 w-4" />
+                פרטי חשבון בנק (לתשלום עמלות)
+              </Label>
+              <Input
+                id="supplierBankAccount"
+                {...form.register("supplierBankAccount")}
+                placeholder="מספר חשבון / IBAN"
+                data-testid="input-supplier-bank"
+              />
+              <p className="text-xs text-muted-foreground">העמלות ישולמו לחשבון האתר בסיום הדיל</p>
+            </div>
+          </div>
+        </Card>
       </div>
 
       <Separator />
@@ -544,6 +639,57 @@ export default function AdminPage() {
         </Dialog>
       </div>
 
+      {!isLoading && deals.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-3 mb-8">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-full bg-primary/10">
+                  <Package className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">סה"כ דילים</p>
+                  <p className="text-2xl font-bold">{deals.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-full bg-success/10">
+                  <Users className="h-6 w-6 text-success" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">סה"כ משתתפים</p>
+                  <p className="text-2xl font-bold">{deals.reduce((sum, d) => sum + d.participants, 0)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-full bg-accent/30">
+                  <Receipt className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">עמלות משוערות</p>
+                  <p className="text-2xl font-bold text-success">
+                    ₪{deals.reduce((sum, d) => {
+                      if (d.platformCommission && d.participants > 0) {
+                        return sum + Math.round(d.currentPrice * d.participants * (d.platformCommission / 100));
+                      }
+                      return sum;
+                    }, 0).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map(i => (
@@ -605,14 +751,37 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="outline" className="text-xs">
                     {deal.tiers.length} מדרגות
                   </Badge>
                   <Badge variant="outline" className="text-xs">
                     עד {Math.max(...deal.tiers.map(t => t.discount))}% הנחה
                   </Badge>
+                  {deal.platformCommission && (
+                    <Badge variant="secondary" className="text-xs">
+                      {deal.platformCommission}% עמלה
+                    </Badge>
+                  )}
                 </div>
+                
+                {deal.supplierName && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Building className="h-3.5 w-3.5" />
+                    <span>ספק: {deal.supplierName}</span>
+                  </div>
+                )}
+                
+                {deal.platformCommission && deal.participants > 0 && (
+                  <div className="p-2 bg-muted rounded-md text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">עמלה משוערת:</span>
+                      <span className="font-semibold text-success">
+                        ₪{Math.round(deal.currentPrice * deal.participants * (deal.platformCommission / 100)).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 
                 <Separator />
                 

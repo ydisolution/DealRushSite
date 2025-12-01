@@ -14,7 +14,9 @@ import {
   ChevronRight,
   ChevronLeft,
   Star,
-  Check
+  Check,
+  Flame,
+  Zap
 } from "lucide-react";
 import CountdownTimer from "./CountdownTimer";
 import PriceDisplay from "./PriceDisplay";
@@ -38,7 +40,7 @@ interface DealDetailProps {
     tiers: Array<{
       minParticipants: number;
       maxParticipants: number;
-      price: number;
+      price?: number;
       discount: number;
     }>;
     specs?: Array<{ label: string; value: string }>;
@@ -82,6 +84,43 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
   const savings = originalPrice - currentPrice;
   const discount = Math.round((savings / originalPrice) * 100);
   const { firstBuyerPrice, lastBuyerPrice, avgPrice } = calculatePositionPricing(currentPrice);
+
+  const getNextTierInfo = () => {
+    const sortedTiers = [...tiers].sort((a, b) => a.minParticipants - b.minParticipants);
+    const currentTierIndex = sortedTiers.findIndex(t => 
+      participants >= t.minParticipants && participants <= t.maxParticipants
+    );
+    
+    if (currentTierIndex === -1 || currentTierIndex >= sortedTiers.length - 1) {
+      return null;
+    }
+    
+    const nextTier = sortedTiers[currentTierIndex + 1];
+    const participantsNeeded = nextTier.minParticipants - participants;
+    
+    if (!nextTier.price) {
+      const calculatedPrice = Math.round(originalPrice * (1 - nextTier.discount / 100));
+      const priceDrop = currentPrice - calculatedPrice;
+      
+      return {
+        participantsNeeded,
+        nextDiscount: nextTier.discount,
+        nextPrice: calculatedPrice,
+        priceDrop,
+      };
+    }
+    
+    const priceDrop = currentPrice - nextTier.price;
+    
+    return {
+      participantsNeeded,
+      nextDiscount: nextTier.discount,
+      nextPrice: nextTier.price,
+      priceDrop,
+    };
+  };
+
+  const nextTierInfo = getNextTierInfo();
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -196,6 +235,36 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
               target={targetParticipants}
               size="lg"
             />
+
+            {nextTierInfo && nextTierInfo.participantsNeeded > 0 && (
+              <Card className="border-urgent/50 bg-gradient-to-r from-urgent/10 to-warning/10" data-testid="fomo-banner">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-urgent/20 animate-pulse">
+                      <Flame className="h-6 w-6 text-urgent" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-lg">
+                        עוד רק{" "}
+                        <span className="text-urgent text-xl">{nextTierInfo.participantsNeeded}</span>{" "}
+                        מצטרפים למדרגה הבאה!
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        כשנגיע ל-{nextTierInfo.nextDiscount}% הנחה, המחיר יירד ב-₪{nextTierInfo.priceDrop.toLocaleString()} נוספים
+                      </p>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs text-muted-foreground">מחיר הבא</p>
+                      <p className="text-lg font-bold text-success">₪{nextTierInfo.nextPrice.toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-sm">
+                    <Zap className="h-4 w-4 text-warning" />
+                    <span className="text-muted-foreground">שתף חברים כדי להגיע למחיר הטוב יותר!</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Button 
               size="lg" 

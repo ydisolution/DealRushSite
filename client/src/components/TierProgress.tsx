@@ -5,7 +5,7 @@ import { calculatePricingFromTier } from "@/lib/pricing";
 interface Tier {
   minParticipants: number;
   maxParticipants: number;
-  price: number;
+  price?: number;
   discount: number;
 }
 
