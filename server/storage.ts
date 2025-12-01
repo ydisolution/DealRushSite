@@ -455,6 +455,12 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getActiveDeals(): Promise<Deal[]> {
+    return Array.from(this.dealsMap.values()).filter(
+      d => d.isActive === "true" && d.status === "active"
+    );
+  }
+
   async getActiveDealsClosingBefore(date: Date): Promise<Deal[]> {
     return Array.from(this.dealsMap.values()).filter(
       d => d.isActive === "true" && d.endTime < date

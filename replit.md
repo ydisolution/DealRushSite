@@ -20,7 +20,9 @@ Preferred communication style: Simple, everyday language.
 - Updated participants table to track payment status and Stripe payment method IDs
 - Added card validation requirement before users can join deals
 - Implemented automatic deal closure service:
-  - Periodic check (every 60 seconds) for expired deals
+  - Scheduled closure: each deal is scheduled to close exactly when its timer reaches 0
+  - New deals are automatically scheduled when created
+  - Deal updates reschedule the closure time
   - Checks minimum participants requirement
   - If minimum not met: cancels deal, notifies all participants (no charge)
   - If minimum met: charges all participants using stored payment methods
