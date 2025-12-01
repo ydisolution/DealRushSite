@@ -14,6 +14,7 @@ import HowItWorksPageRoute from "@/pages/HowItWorksPageRoute";
 import DashboardPage from "@/pages/DashboardPage";
 import CheckoutPage from "@/pages/CheckoutPage";
 import AdminPage from "@/pages/AdminPage";
+import ClosingTodayPage from "@/pages/ClosingTodayPage";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -48,6 +49,7 @@ function Router() {
         )}
       </Route>
       <Route path="/checkout/:id" component={CheckoutPage} />
+      <Route path="/closing-today" component={ClosingTodayPage} />
       <Route path="/admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>

@@ -90,7 +90,7 @@ export default function DealCard({ deal, onJoin, onView }: DealCardProps) {
 
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-muted/30 rounded-md p-2 text-center min-h-[60px] flex flex-col justify-center">
-            <p className="text-[10px] text-muted-foreground mb-0.5">חנויות רגילות</p>
+            <p className="text-[10px] text-muted-foreground mb-0.5">מחיר ראשוני</p>
             <p className="font-bold text-sm line-through text-muted-foreground">
               ₪{originalPrice.toLocaleString()}
             </p>

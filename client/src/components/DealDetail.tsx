@@ -19,6 +19,7 @@ import {
   Zap
 } from "lucide-react";
 import CountdownTimer from "./CountdownTimer";
+import CircularCountdownTimer from "./CircularCountdownTimer";
 import PriceDisplay from "./PriceDisplay";
 import ProgressBar from "./ProgressBar";
 import TierProgress from "./TierProgress";
@@ -167,14 +168,16 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
                   <div className="h-2 w-2 rounded-full bg-urgent animate-pulse" />
                   הדיל נסגר בעוד:
                 </div>
-                <CountdownTimer endTime={endTime} size="lg" centered />
+                <div className="flex justify-center">
+                  <CircularCountdownTimer endTime={endTime} size="lg" />
+                </div>
               </CardContent>
             </Card>
 
             <div className="grid grid-cols-2 gap-4">
               <Card className="bg-muted/30">
                 <CardContent className="p-4 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">חנויות רגילות</p>
+                  <p className="text-xs text-muted-foreground mb-1">מחיר ראשוני</p>
                   <p className="text-xl font-bold line-through text-muted-foreground">
                     ₪{originalPrice.toLocaleString()}
                   </p>

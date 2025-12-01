@@ -30,8 +30,8 @@ export default function Header({
   const navLinks = [
     { href: "/", label: "דף הבית" },
     { href: "/deals", label: "דילים פעילים" },
+    { href: "/closing-today", label: "נסגרים היום" },
     { href: "/how-it-works", label: "איך זה עובד" },
-    { href: "/admin", label: "ניהול" },
   ];
 
   const isActive = (href: string) => location === href;
