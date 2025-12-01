@@ -19,6 +19,19 @@ Preferred communication style: Simple, everyday language.
 - Integrated Stripe for payment processing with card validation before joining deals
 - Updated participants table to track payment status and Stripe payment method IDs
 - Added card validation requirement before users can join deals
+- Implemented automatic deal closure service:
+  - Periodic check (every 60 seconds) for expired deals
+  - Checks minimum participants requirement
+  - If minimum not met: cancels deal, notifies all participants (no charge)
+  - If minimum met: charges all participants using stored payment methods
+  - Handles partial payment failures with proper status tracking
+- Added email notifications:
+  - sendDealCancelledNotification - when deal doesn't reach minimum
+  - sendTierUnlockedNotification - when new discount tier is reached
+  - sendPaymentChargedNotification - after successful payment
+- Added WebSocket notifications for real-time updates:
+  - deal_cancelled, deal_closed, tier_unlocked message types
+- Added idempotency guards to prevent duplicate deal processing
 
 ## System Architecture
 
