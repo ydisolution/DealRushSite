@@ -19,7 +19,7 @@ import {
   Zap
 } from "lucide-react";
 import CountdownTimer from "./CountdownTimer";
-import CircularCountdownTimer from "./CircularCountdownTimer";
+import FomoCountdownTimer from "./FomoCountdownTimer";
 import PriceDisplay from "./PriceDisplay";
 import ProgressBar from "./ProgressBar";
 import TierProgress from "./TierProgress";
@@ -162,15 +162,9 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
               <p className="text-muted-foreground">{description}</p>
             </div>
 
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="p-4 space-y-4">
-                <div className="flex items-center justify-center gap-2 text-sm font-medium">
-                  <div className="h-2 w-2 rounded-full bg-urgent animate-pulse" />
-                  הדיל נסגר בעוד:
-                </div>
-                <div className="flex justify-center">
-                  <CircularCountdownTimer endTime={endTime} size="lg" showEndDate={true} />
-                </div>
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-accent/10 overflow-hidden">
+              <CardContent className="p-6">
+                <FomoCountdownTimer endTime={endTime} size="md" showEndDate={true} />
               </CardContent>
             </Card>
 

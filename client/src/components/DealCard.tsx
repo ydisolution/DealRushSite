@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingDown, Sparkles } from "lucide-react";
+import { Users, TrendingDown, Sparkles, Percent } from "lucide-react";
 import CountdownTimer from "./CountdownTimer";
 import ProgressBar from "./ProgressBar";
 import { calculatePositionPricing } from "@/lib/pricing";
@@ -20,6 +20,7 @@ export interface Deal {
   nextTierParticipants?: number;
   category?: string;
   discountPercent?: number;
+  currentTierDiscount?: number;
 }
 
 interface DealCardProps {
@@ -46,7 +47,8 @@ export default function DealCard({ deal, onJoin, onView }: DealCardProps) {
     ? nextTierParticipants - participants 
     : null;
 
-  const discount = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+  const calculatedDiscount = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+  const discount = deal.discountPercent || calculatedDiscount;
   const { firstBuyerPrice, lastBuyerPrice, avgPrice } = calculatePositionPricing(currentPrice);
 
   return (
@@ -69,11 +71,18 @@ export default function DealCard({ deal, onJoin, onView }: DealCardProps) {
           <Users className="h-3.5 w-3.5" />
           {participants} קונים
         </Badge>
-        <Badge 
-          className="absolute top-3 right-3 bg-success text-success-foreground"
+        <div 
+          className="absolute top-3 right-3 flex flex-col items-end gap-1"
+          data-testid={`deal-discount-badge-${id}`}
         >
-          -{discount}%
-        </Badge>
+          <Badge className="bg-gradient-to-r from-success to-emerald-600 text-white font-bold text-sm px-3 py-1 shadow-lg">
+            <Percent className="h-3.5 w-3.5 ml-1" />
+            {discount}% הנחה
+          </Badge>
+          <span className="text-[10px] bg-black/60 text-white px-2 py-0.5 rounded-full backdrop-blur-sm">
+            מדרגה נוכחית
+          </span>
+        </div>
       </div>
       
       <CardContent className="p-4 space-y-3">
