@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 interface CircularCountdownTimerProps {
-  endTime: Date;
+  endTime: Date | string;
   size?: "sm" | "md" | "lg";
   showLabels?: boolean;
   onExpire?: () => void;
@@ -18,18 +18,26 @@ interface TimeLeft {
 type TimeStatus = "safe" | "warning" | "urgent" | "critical";
 
 export default function CircularCountdownTimer({ 
-  endTime, 
+  endTime: endTimeProp, 
   size = "md",
   showLabels = true,
   onExpire 
 }: CircularCountdownTimerProps) {
+  const endTime = useMemo(() => {
+    return typeof endTimeProp === 'string' ? new Date(endTimeProp) : endTimeProp;
+  }, [endTimeProp]);
+
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ days: 0, hours: 0, minutes: 0, seconds: 0, totalSeconds: 0 });
   const [status, setStatus] = useState<TimeStatus>("safe");
   const [progress, setProgress] = useState(100);
+  const [initialDuration] = useState(() => {
+    const now = new Date().getTime();
+    const end = typeof endTimeProp === 'string' ? new Date(endTimeProp).getTime() : endTimeProp.getTime();
+    return Math.max(end - now, 1);
+  });
 
   useEffect(() => {
-    const startTime = new Date();
-    const totalDuration = endTime.getTime() - startTime.getTime();
+    const totalDuration = initialDuration;
 
     const calculateTimeLeft = () => {
       const now = new Date().getTime();
@@ -53,7 +61,7 @@ export default function CircularCountdownTimer({
         setStatus("safe");
       }
 
-      const progressPercent = Math.max(0, Math.min(100, (difference / totalDuration) * 100));
+      const progressPercent = Math.max(0, Math.min(100, (difference / Math.max(totalDuration, 1)) * 100));
       setProgress(progressPercent);
 
       return {
@@ -86,16 +94,16 @@ export default function CircularCountdownTimer({
 
   const statusColors = {
     safe: {
-      stroke: "stroke-green-500",
-      bg: "stroke-green-500/20",
-      text: "text-green-600 dark:text-green-400",
-      glow: "drop-shadow-[0_0_8px_rgba(34,197,94,0.5)]",
+      stroke: "stroke-emerald-500",
+      bg: "stroke-emerald-500/20",
+      text: "text-emerald-600 dark:text-emerald-400",
+      glow: "drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]",
     },
     warning: {
-      stroke: "stroke-yellow-500",
-      bg: "stroke-yellow-500/20",
-      text: "text-yellow-600 dark:text-yellow-400",
-      glow: "drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]",
+      stroke: "stroke-amber-500",
+      bg: "stroke-amber-500/20",
+      text: "text-amber-600 dark:text-amber-400",
+      glow: "drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]",
     },
     urgent: {
       stroke: "stroke-orange-500",

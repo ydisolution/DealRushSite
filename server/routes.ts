@@ -8,6 +8,7 @@ import path from "path";
 import fs from "fs";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { notificationService } from "./websocket";
+import { sendDealJoinNotification, sendPriceDropNotification, sendDealClosedNotification, sendEmail } from "./email";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -198,6 +199,7 @@ export async function registerRoutes(
   const joinDealSchema = z.object({
     name: z.string().min(1).max(100).optional(),
     userId: z.string().optional(),
+    email: z.string().email().optional(),
   });
 
   app.post("/api/deals/:id/join", async (req: Request, res: Response) => {
@@ -212,7 +214,7 @@ export async function registerRoutes(
         });
       }
       
-      const { name, userId } = validationResult.data;
+      const { name, userId, email } = validationResult.data;
       
       const deal = await storage.getDeal(dealId);
       
@@ -266,6 +268,12 @@ export async function registerRoutes(
         newCurrentPrice
       );
 
+      if (email) {
+        sendDealJoinNotification(email, deal.name, pricePaid, newPosition).catch(err => {
+          console.error("Failed to send join notification email:", err);
+        });
+      }
+
       res.status(201).json({ 
         participant,
         newParticipantCount,
@@ -274,6 +282,31 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error joining deal:", error);
       res.status(500).json({ error: "Failed to join deal" });
+    }
+  });
+
+  app.post("/api/email/test", isAuthenticated, async (req: any, res) => {
+    try {
+      const { to, subject, body } = req.body;
+      
+      if (!to || !subject || !body) {
+        return res.status(400).json({ error: "Missing required fields: to, subject, body" });
+      }
+      
+      const success = await sendEmail({
+        to,
+        subject,
+        htmlBody: body,
+      });
+      
+      if (success) {
+        res.json({ message: "Email sent successfully" });
+      } else {
+        res.status(500).json({ error: "Failed to send email" });
+      }
+    } catch (error) {
+      console.error("Email test error:", error);
+      res.status(500).json({ error: "Failed to send test email" });
     }
   });
 
