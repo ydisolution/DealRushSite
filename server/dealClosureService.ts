@@ -17,38 +17,73 @@ interface ChargeResult {
 }
 
 class DealClosureService {
-  private checkInterval: ReturnType<typeof setInterval> | null = null;
-  private readonly CHECK_INTERVAL_MS = 60000;
+  private scheduledClosures: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private processingDeals: Set<string> = new Set();
 
-  start() {
-    if (this.checkInterval) return;
-    
+  async start() {
     console.log('Deal closure service started');
-    this.checkInterval = setInterval(() => this.checkExpiredDeals(), this.CHECK_INTERVAL_MS);
-    this.checkExpiredDeals();
+    await this.scheduleAllActiveDeals();
   }
 
   stop() {
-    if (this.checkInterval) {
-      clearInterval(this.checkInterval);
-      this.checkInterval = null;
-      console.log('Deal closure service stopped');
+    for (const [dealId, timeout] of this.scheduledClosures) {
+      clearTimeout(timeout);
+      console.log(`Cancelled scheduled closure for deal ${dealId}`);
+    }
+    this.scheduledClosures.clear();
+    console.log('Deal closure service stopped');
+  }
+
+  private async scheduleAllActiveDeals() {
+    try {
+      const activeDeals = await storage.getActiveDeals();
+      console.log(`Found ${activeDeals.length} active deals to schedule`);
+      
+      for (const deal of activeDeals) {
+        this.scheduleDealClosure(deal);
+      }
+    } catch (error) {
+      console.error('Error scheduling active deals:', error);
     }
   }
 
-  async checkExpiredDeals() {
-    try {
-      const now = new Date();
-      const expiredDeals = await storage.getActiveDealsClosingBefore(now);
-      
-      for (const deal of expiredDeals) {
-        if (!this.processingDeals.has(deal.id)) {
-          await this.closeDeal(deal);
-        }
-      }
-    } catch (error) {
-      console.error('Error checking expired deals:', error);
+  scheduleDealClosure(deal: Deal) {
+    if (this.scheduledClosures.has(deal.id)) {
+      clearTimeout(this.scheduledClosures.get(deal.id)!);
+      this.scheduledClosures.delete(deal.id);
+    }
+
+    if (deal.isActive !== 'true' || deal.status !== 'active') {
+      return;
+    }
+
+    const endTime = new Date(deal.endTime);
+    const now = new Date();
+    const msUntilClose = endTime.getTime() - now.getTime();
+
+    if (msUntilClose <= 0) {
+      console.log(`Deal ${deal.id} (${deal.name}) has already expired, closing now`);
+      this.closeDeal(deal);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      console.log(`Timer fired for deal ${deal.id} (${deal.name})`);
+      this.scheduledClosures.delete(deal.id);
+      this.closeDeal(deal);
+    }, msUntilClose);
+
+    this.scheduledClosures.set(deal.id, timeout);
+    
+    const closeDate = endTime.toLocaleString('he-IL');
+    console.log(`Scheduled deal ${deal.id} (${deal.name}) to close at ${closeDate} (in ${Math.round(msUntilClose / 1000)} seconds)`);
+  }
+
+  cancelScheduledClosure(dealId: string) {
+    if (this.scheduledClosures.has(dealId)) {
+      clearTimeout(this.scheduledClosures.get(dealId)!);
+      this.scheduledClosures.delete(dealId);
+      console.log(`Cancelled scheduled closure for deal ${dealId}`);
     }
   }
 
@@ -89,6 +124,7 @@ class DealClosureService {
     } catch (error) {
       console.error(`Error closing deal ${deal.id}:`, error);
       await storage.updateDeal(deal.id, { status: 'active' });
+      this.scheduleDealClosure(deal);
     } finally {
       this.processingDeals.delete(deal.id);
     }
@@ -122,20 +158,28 @@ class DealClosureService {
       reason,
     });
 
-    console.log(`Deal ${deal.id} cancelled successfully`);
+    console.log(`Deal ${deal.id} cancelled, notified ${participants.length} participants`);
   }
 
   private async chargeParticipants(deal: Deal, participants: Participant[]) {
-    console.log(`Charging ${participants.length} participants for deal ${deal.id}`);
+    const currentTierIndex = deal.tiers.findIndex(t => 
+      deal.participants >= t.minParticipants && deal.participants <= t.maxParticipants
+    );
     
-    const finalPrice = deal.currentPrice;
+    const currentTier = currentTierIndex >= 0 ? deal.tiers[currentTierIndex] : deal.tiers[0];
+    const finalPrice = currentTier?.price || 
+      Math.round(deal.originalPrice * (1 - (currentTier?.discount || 0) / 100));
+
+    console.log(`Charging ${participants.length} participants at final price: ₪${finalPrice}`);
+
     const results: ChargeResult[] = [];
 
     for (const participant of participants) {
       try {
         const user = participant.userId ? await storage.getUser(participant.userId) : null;
+        const customerId = user?.stripeCustomerId;
         
-        if (!user?.stripeCustomerId || !participant.stripePaymentMethodId) {
+        if (!customerId || !participant.stripePaymentMethodId) {
           results.push({
             participantId: participant.id,
             success: false,
@@ -144,16 +188,11 @@ class DealClosureService {
           continue;
         }
 
-        const paymentIntent = await stripeService.chargePaymentMethod(
-          user.stripeCustomerId,
+        const paymentIntent = await stripeService.chargeCustomer(
+          customerId,
           participant.stripePaymentMethodId,
           finalPrice,
-          'ils',
-          {
-            dealId: deal.id,
-            participantId: participant.id,
-            dealName: deal.name,
-          }
+          `DealRush: ${deal.name}`
         );
 
         await storage.updateParticipant(participant.id, {
@@ -162,23 +201,24 @@ class DealClosureService {
           pricePaid: finalPrice,
         });
 
+        results.push({
+          participantId: participant.id,
+          success: true,
+          paymentIntentId: paymentIntent.id,
+        });
+
         const email = participant.email;
         if (email) {
           sendPaymentChargedNotification(
             email,
             deal.name,
             finalPrice,
-            participant.cardLast4 || '****'
+            paymentIntent.id
           ).catch(err => {
-            console.error(`Failed to send payment confirmation to ${email}:`, err);
+            console.error(`Failed to send payment notification to ${email}:`, err);
           });
         }
 
-        results.push({
-          participantId: participant.id,
-          success: true,
-          paymentIntentId: paymentIntent.id,
-        });
       } catch (error: any) {
         console.error(`Failed to charge participant ${participant.id}:`, error);
         
@@ -246,7 +286,8 @@ class DealClosureService {
   async notifyTierUnlocked(deal: Deal, newTierIndex: number, oldPrice: number, newPrice: number) {
     const participants = await storage.getParticipantsByDeal(deal.id);
     const tier = deal.tiers[newTierIndex];
-    const discountPercent = tier.discount;
+    
+    if (!tier) return;
 
     for (const participant of participants) {
       const email = participant.email;
@@ -254,10 +295,9 @@ class DealClosureService {
         sendTierUnlockedNotification(
           email,
           deal.name,
-          newTierIndex + 1,
+          tier.discount,
           oldPrice,
-          newPrice,
-          discountPercent
+          newPrice
         ).catch(err => {
           console.error(`Failed to send tier unlock notification to ${email}:`, err);
         });
@@ -268,13 +308,13 @@ class DealClosureService {
       type: 'tier_unlocked',
       dealId: deal.id,
       dealName: deal.name,
-      tierNumber: newTierIndex + 1,
-      oldPrice,
+      tierIndex: newTierIndex,
+      discount: tier.discount,
       newPrice,
-      discountPercent,
+      participantCount: deal.participants,
     });
 
-    console.log(`Tier ${newTierIndex + 1} unlocked for deal ${deal.id}`);
+    console.log(`Notified ${participants.length} participants about tier unlock: ${tier.discount}% off`);
   }
 }
 

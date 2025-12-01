@@ -555,6 +555,9 @@ export async function registerRoutes(
       
       const validated = insertDealSchema.parse(body);
       const deal = await storage.createDeal(validated);
+      
+      dealClosureService.scheduleDealClosure(deal);
+      
       res.status(201).json(deal);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -586,6 +589,9 @@ export async function registerRoutes(
       if (!deal) {
         return res.status(404).json({ error: "Deal not found" });
       }
+      
+      dealClosureService.scheduleDealClosure(deal);
+      
       res.json(deal);
     } catch (error) {
       res.status(500).json({ error: "Failed to update deal" });
@@ -594,6 +600,8 @@ export async function registerRoutes(
 
   app.delete("/api/deals/:id", isAdmin, async (req: Request, res: Response) => {
     try {
+      dealClosureService.cancelScheduledClosure(req.params.id);
+      
       const success = await storage.deleteDeal(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Deal not found" });

@@ -26,6 +26,7 @@ export interface IStorage {
   getDeals(): Promise<Deal[]>;
   getDeal(id: string): Promise<Deal | undefined>;
   getDealsByCategory(category: string): Promise<Deal[]>;
+  getActiveDeals(): Promise<Deal[]>;
   getActiveDealsClosingBefore(date: Date): Promise<Deal[]>;
   createDeal(deal: InsertDeal): Promise<Deal>;
   updateDeal(id: string, deal: Partial<InsertDeal>): Promise<Deal | undefined>;
@@ -97,6 +98,15 @@ export class DatabaseStorage implements IStorage {
   async getDealsByCategory(category: string): Promise<Deal[]> {
     const allDeals = await db.select().from(deals).where(eq(deals.category, category));
     return allDeals.filter(d => d.isActive === "true");
+  }
+
+  async getActiveDeals(): Promise<Deal[]> {
+    return await db.select().from(deals).where(
+      and(
+        eq(deals.isActive, "true"),
+        eq(deals.status, "active")
+      )
+    );
   }
 
   async getActiveDealsClosingBefore(date: Date): Promise<Deal[]> {
