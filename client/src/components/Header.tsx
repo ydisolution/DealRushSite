@@ -2,11 +2,15 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Zap, Menu, X, User, ShoppingBag, Bell, Settings } from "lucide-react";
+import { Zap, Menu, User, ShoppingBag, Bell } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { User as UserType } from "@shared/schema";
 
 interface HeaderProps {
   isLoggedIn?: boolean;
+  isLoading?: boolean;
+  user?: UserType | null;
   notificationCount?: number;
   onLogin?: () => void;
   onLogout?: () => void;
@@ -14,6 +18,8 @@ interface HeaderProps {
 
 export default function Header({ 
   isLoggedIn = false, 
+  isLoading = false,
+  user,
   notificationCount = 0,
   onLogin,
   onLogout 
@@ -82,8 +88,17 @@ export default function Header({
                 </Button>
               </Link>
               <Link href="/dashboard">
-                <Button variant="ghost" size="icon" data-testid="button-profile">
-                  <User className="h-5 w-5" />
+                <Button variant="ghost" size="icon" data-testid="button-profile" className="p-0 rounded-full">
+                  {user?.profileImageUrl ? (
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user.profileImageUrl} alt={user.firstName || "User"} className="object-cover" />
+                      <AvatarFallback>
+                        {user.firstName?.[0]}{user.lastName?.[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  ) : (
+                    <User className="h-5 w-5" />
+                  )}
                 </Button>
               </Link>
               <Button 

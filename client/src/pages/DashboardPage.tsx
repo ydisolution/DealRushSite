@@ -1,9 +1,8 @@
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "@/components/Dashboard";
-
-import acImage from '@assets/generated_images/lg_inverter_air_conditioner.png';
-import headphonesImage from '@assets/generated_images/sony_wireless_headphones.png';
-import tvImage from '@assets/generated_images/samsung_65_inch_tv.png';
+import type { Participant, Deal } from "@shared/schema";
 
 interface DashboardPageProps {
   onLogout?: () => void;
@@ -11,64 +10,79 @@ interface DashboardPageProps {
 
 export default function DashboardPage({ onLogout }: DashboardPageProps) {
   const [, setLocation] = useLocation();
+  const { user, isLoading: authLoading } = useAuth();
 
-  // todo: remove mock functionality
-  const mockUser = {
-    name: "ישראל ישראלי",
-    email: "israel@example.com",
-    totalSaved: 2340,
-    totalOrders: 7,
-    avgDiscount: 32,
+  const { data: purchases = [], isLoading: purchasesLoading } = useQuery<Participant[]>({
+    queryKey: ["/api/user/purchases"],
+    enabled: !!user,
+  });
+
+  const { data: allDeals = [] } = useQuery<Deal[]>({
+    queryKey: ["/api/deals"],
+  });
+
+  if (authLoading || purchasesLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <p className="text-muted-foreground">יש להתחבר כדי לצפות באזור האישי</p>
+      </div>
+    );
+  }
+
+  const dealMap = new Map(allDeals.map(d => [d.id, d]));
+  
+  const userDeals = purchases.map(p => {
+    const deal = dealMap.get(p.dealId);
+    const now = new Date();
+    const endTime = deal?.endTime ? new Date(deal.endTime) : now;
+    const isActive = endTime > now;
+    
+    return {
+      id: p.dealId,
+      productName: deal?.name || "דיל",
+      productImage: deal?.images?.[0] || "",
+      status: isActive ? "active" as const : "completed" as const,
+      yourPrice: p.pricePaid,
+      currentPrice: deal?.currentPrice || p.pricePaid,
+      endTime: endTime,
+      savedAmount: (deal?.originalPrice || p.pricePaid) - p.pricePaid,
+      completedDate: !isActive ? endTime : undefined,
+    };
+  });
+
+  const totalSaved = userDeals.reduce((sum, d) => sum + d.savedAmount, 0);
+  const avgDiscount = userDeals.length > 0 
+    ? Math.round(userDeals.reduce((sum, d) => {
+        const original = d.yourPrice + d.savedAmount;
+        return sum + ((d.savedAmount / original) * 100);
+      }, 0) / userDeals.length)
+    : 0;
+
+  const dashboardUser = {
+    name: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "משתמש",
+    email: user.email || "",
+    totalSaved,
+    totalOrders: purchases.length,
+    avgDiscount,
   };
 
-  // todo: remove mock functionality
-  const mockDeals = [
-    {
-      id: "deal-1",
-      productName: "מזגן LG Inverter 12,000 BTU",
-      productImage: acImage,
-      status: "active" as const,
-      yourPrice: 3690,
-      currentPrice: 3690,
-      endTime: new Date(Date.now() + 17 * 60 * 60 * 1000),
-      savedAmount: 810,
-    },
-    {
-      id: "deal-2",
-      productName: "טלוויזיה Samsung QLED 65 אינץ'",
-      productImage: tvImage,
-      status: "active" as const,
-      yourPrice: 5200,
-      currentPrice: 4875,
-      endTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-      savedAmount: 1625,
-    },
-    {
-      id: "deal-3",
-      productName: "אוזניות Sony WH-1000XM5",
-      productImage: headphonesImage,
-      status: "shipped" as const,
-      yourPrice: 890,
-      currentPrice: 890,
-      completedDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      savedAmount: 510,
-      shippingStatus: "בדרך אליך - צפי הגעה מחר",
-      trackingNumber: "IL123456789",
-    },
-  ];
-
-  // todo: remove mock functionality
-  const mockNotifications = [
-    { id: "n1", message: "המחיר בדיל 'מזגן LG' ירד! עכשיו ₪3,690", timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), read: false },
-    { id: "n2", message: "דיל 'אוזניות Sony' הסתיים - שילמת ₪890", timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), read: true },
-    { id: "n3", message: "משלוח יצא - חבילה מגיעה מחר", timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), read: false },
+  const notifications = [
+    { id: "welcome", message: `ברוך הבא, ${dashboardUser.name}!`, timestamp: new Date(), read: false },
   ];
 
   return (
     <Dashboard 
-      user={mockUser}
-      deals={mockDeals}
-      notifications={mockNotifications}
+      user={dashboardUser}
+      deals={userDeals}
+      notifications={notifications}
       onViewDeal={(dealId) => setLocation(`/deal/${dealId}`)}
       onLogout={onLogout}
     />
