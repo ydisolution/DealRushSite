@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import HeroSection from "@/components/HeroSection";
@@ -6,6 +6,7 @@ import DealsGrid from "@/components/DealsGrid";
 import HowItWorks from "@/components/HowItWorks";
 import TrustBadges from "@/components/TrustBadges";
 import Categories from "@/components/Categories";
+import SearchFilter from "@/components/SearchFilter";
 import type { Deal } from "@shared/schema";
 
 interface HomeProps {
@@ -15,10 +16,17 @@ interface HomeProps {
 export default function Home({ onOpenAuth }: HomeProps) {
   const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 3000000]);
 
   const { data: deals = [], isLoading } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
   });
+
+  const maxPrice = useMemo(() => {
+    if (deals.length === 0) return 3000000;
+    return Math.max(...deals.map(d => d.originalPrice));
+  }, [deals]);
 
   const transformedDeals = deals.map(deal => ({
     id: deal.id,
@@ -41,9 +49,21 @@ export default function Home({ onOpenAuth }: HomeProps) {
     )?.discount || Math.round(((deal.originalPrice - deal.currentPrice) / deal.originalPrice) * 100),
   }));
 
-  const filteredDeals = selectedCategory 
-    ? transformedDeals.filter(deal => deal.category === selectedCategory)
-    : transformedDeals;
+  const filteredDeals = useMemo(() => {
+    return transformedDeals.filter(deal => {
+      const matchesCategory = !selectedCategory || deal.category === selectedCategory;
+      const matchesSearch = !searchTerm || 
+        deal.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesPrice = deal.currentPrice >= priceRange[0] && 
+        deal.currentPrice <= priceRange[1];
+      
+      return matchesCategory && matchesSearch && matchesPrice;
+    });
+  }, [transformedDeals, selectedCategory, searchTerm, priceRange]);
+
+  const handlePriceRangeChange = (min: number, max: number) => {
+    setPriceRange([min, max]);
+  };
 
   const handleViewDeal = (dealId: string) => {
     setLocation(`/deal/${dealId}`);
@@ -59,6 +79,15 @@ export default function Home({ onOpenAuth }: HomeProps) {
         onGetStarted={() => document.getElementById('deals-section')?.scrollIntoView({ behavior: 'smooth' })}
         onLearnMore={() => setLocation('/how-it-works')}
       />
+      <div className="container mx-auto px-4">
+        <SearchFilter
+          onSearchChange={setSearchTerm}
+          onCategoryChange={setSelectedCategory}
+          onPriceRangeChange={handlePriceRangeChange}
+          selectedCategory={selectedCategory}
+          maxPrice={maxPrice}
+        />
+      </div>
       <Categories 
         selectedCategory={selectedCategory}
         onSelectCategory={setSelectedCategory}
@@ -66,7 +95,13 @@ export default function Home({ onOpenAuth }: HomeProps) {
       <div id="deals-section">
         <DealsGrid 
           deals={filteredDeals}
-          title={selectedCategory ? `דילים בקטגוריה` : "הדילים הפעילים עכשיו"}
+          title={
+            searchTerm 
+              ? `תוצאות חיפוש: "${searchTerm}"` 
+              : selectedCategory 
+                ? `דילים בקטגוריה` 
+                : "הדילים הפעילים עכשיו"
+          }
           onViewDeal={handleViewDeal}
           onJoinDeal={handleJoinDeal}
           isLoading={isLoading}

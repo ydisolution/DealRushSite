@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
+import { useNotifications } from "@/hooks/useNotifications";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import NotFound from "@/pages/not-found";
@@ -55,6 +56,7 @@ function Router() {
 
 function AppContent() {
   const { isAuthenticated, isLoading, user } = useAuth();
+  useNotifications();
   const notificationCount = isAuthenticated ? 2 : 0;
 
   const handleLogin = () => {

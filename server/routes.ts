@@ -1,12 +1,13 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDealSchema } from "@shared/schema";
+import { insertDealSchema, insertParticipantSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { notificationService } from "./websocket";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -191,6 +192,88 @@ export async function registerRoutes(
       res.json(participants);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch participants" });
+    }
+  });
+
+  const joinDealSchema = z.object({
+    name: z.string().min(1).max(100).optional(),
+    userId: z.string().optional(),
+  });
+
+  app.post("/api/deals/:id/join", async (req: Request, res: Response) => {
+    try {
+      const dealId = req.params.id;
+      
+      const validationResult = joinDealSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: validationResult.error.errors 
+        });
+      }
+      
+      const { name, userId } = validationResult.data;
+      
+      const deal = await storage.getDeal(dealId);
+      
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      const existingParticipants = await storage.getParticipantsByDeal(dealId);
+      const newPosition = existingParticipants.length + 1;
+      
+      const tier = deal.tiers.find(t => 
+        newPosition >= t.minParticipants && newPosition <= t.maxParticipants
+      ) || deal.tiers[deal.tiers.length - 1];
+      
+      const positionInTier = newPosition - tier.minParticipants;
+      const tierRange = tier.maxParticipants - tier.minParticipants + 1;
+      const positionRatio = positionInTier / tierRange;
+      const priceVariance = (positionRatio - 0.5) * 0.05;
+      const basePrice = tier.price || deal.originalPrice * (1 - tier.discount / 100);
+      const pricePaid = Math.round(basePrice * (1 + priceVariance));
+      
+      const participantData = {
+        dealId,
+        name: name || "משתתף אנונימי",
+        userId: userId || null,
+        pricePaid,
+        position: newPosition,
+      };
+      
+      const participant = await storage.addParticipant(participantData);
+      
+      const updatedParticipants = await storage.getParticipantsByDeal(dealId);
+      const newParticipantCount = updatedParticipants.length;
+      
+      const currentTier = deal.tiers.find(t => 
+        newParticipantCount >= t.minParticipants && newParticipantCount <= t.maxParticipants
+      ) || deal.tiers[deal.tiers.length - 1];
+      
+      const newCurrentPrice = currentTier.price || Math.round(deal.originalPrice * (1 - currentTier.discount / 100));
+      
+      await storage.updateDeal(dealId, { 
+        participants: newParticipantCount,
+        currentPrice: newCurrentPrice,
+      });
+
+      notificationService.notifyParticipantJoined(
+        dealId,
+        deal.name,
+        participantData.name,
+        newParticipantCount,
+        newCurrentPrice
+      );
+
+      res.status(201).json({ 
+        participant,
+        newParticipantCount,
+        newPrice: newCurrentPrice,
+      });
+    } catch (error) {
+      console.error("Error joining deal:", error);
+      res.status(500).json({ error: "Failed to join deal" });
     }
   });
 
