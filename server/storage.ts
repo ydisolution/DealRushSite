@@ -150,6 +150,10 @@ export class MemStorage implements IStorage {
         ],
         isActive: "true",
         createdAt: now,
+        supplierName: null,
+        supplierStripeKey: null,
+        supplierBankAccount: null,
+        platformCommission: 5,
       },
       {
         id: "2",
@@ -174,6 +178,10 @@ export class MemStorage implements IStorage {
         ],
         isActive: "true",
         createdAt: now,
+        supplierName: null,
+        supplierStripeKey: null,
+        supplierBankAccount: null,
+        platformCommission: 5,
       },
       {
         id: "3",
@@ -198,6 +206,10 @@ export class MemStorage implements IStorage {
         ],
         isActive: "true",
         createdAt: now,
+        supplierName: null,
+        supplierStripeKey: null,
+        supplierBankAccount: null,
+        platformCommission: 5,
       },
       {
         id: "4",
@@ -222,6 +234,10 @@ export class MemStorage implements IStorage {
         ],
         isActive: "true",
         createdAt: now,
+        supplierName: null,
+        supplierStripeKey: null,
+        supplierBankAccount: null,
+        platformCommission: 5,
       },
       {
         id: "5",
@@ -246,6 +262,10 @@ export class MemStorage implements IStorage {
         ],
         isActive: "true",
         createdAt: now,
+        supplierName: null,
+        supplierStripeKey: null,
+        supplierBankAccount: null,
+        platformCommission: 5,
       },
       {
         id: "6",
@@ -270,6 +290,10 @@ export class MemStorage implements IStorage {
         ],
         isActive: "true",
         createdAt: now,
+        supplierName: null,
+        supplierStripeKey: null,
+        supplierBankAccount: null,
+        platformCommission: 5,
       },
     ];
 

@@ -79,7 +79,11 @@ export default function Home({ onOpenAuth }: HomeProps) {
         onGetStarted={() => document.getElementById('deals-section')?.scrollIntoView({ behavior: 'smooth' })}
         onLearnMore={() => setLocation('/how-it-works')}
       />
-      <div className="container mx-auto px-4">
+      <Categories 
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
+      />
+      <div className="container mx-auto px-4 py-6">
         <SearchFilter
           onSearchChange={setSearchTerm}
           onCategoryChange={setSelectedCategory}
@@ -88,10 +92,6 @@ export default function Home({ onOpenAuth }: HomeProps) {
           maxPrice={maxPrice}
         />
       </div>
-      <Categories 
-        selectedCategory={selectedCategory}
-        onSelectCategory={setSelectedCategory}
-      />
       <div id="deals-section">
         <DealsGrid 
           deals={filteredDeals}
