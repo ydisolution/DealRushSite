@@ -1,10 +1,14 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   CreditCard, 
   Truck, 
@@ -49,8 +53,9 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
   const [step, setStep] = useState<Step>("shipping");
   const [paymentMethod, setPaymentMethod] = useState("credit");
   const [saveDetails, setSaveDetails] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const { toast } = useToast();
+  const { user } = useAuth();
   
   const [shippingInfo, setShippingInfo] = useState({
     fullName: "",
@@ -58,6 +63,35 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
     address: "",
     city: "",
     zipCode: "",
+  });
+
+  const joinDealMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/deals/${deal.id}/join`, {
+        name: shippingInfo.fullName,
+        userId: user?.id,
+        email: user?.email,
+      });
+    },
+    onSuccess: async (response) => {
+      const data = await response.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals", deal.id] });
+      const newOrderId = `DR-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      setOrderId(newOrderId);
+      setStep("confirmation");
+      toast({
+        title: "ההזמנה אושרה!",
+        description: `הצטרפת לדיל בהצלחה. המיקום שלך: ${data.participant?.position}`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "שגיאה בהצטרפות לדיל",
+        description: "אנא נסה שוב מאוחר יותר",
+        variant: "destructive",
+      });
+    },
   });
 
   const savings = deal.originalPrice - deal.currentPrice;
@@ -70,15 +104,10 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsProcessing(true);
-    
-    // todo: remove mock functionality
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    const newOrderId = `DR-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-    setOrderId(newOrderId);
-    setIsProcessing(false);
-    setStep("confirmation");
+    joinDealMutation.mutate();
   };
+
+  const isProcessing = joinDealMutation.isPending;
 
   const steps = [
     { id: "shipping", label: "פרטי משלוח" },

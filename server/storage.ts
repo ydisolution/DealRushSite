@@ -346,6 +346,10 @@ export class MemStorage implements IStorage {
       specs: insertDeal.specs ?? [],
       isActive: insertDeal.isActive ?? "true",
       createdAt: new Date(),
+      supplierName: insertDeal.supplierName ?? null,
+      supplierStripeKey: insertDeal.supplierStripeKey ?? null,
+      supplierBankAccount: insertDeal.supplierBankAccount ?? null,
+      platformCommission: insertDeal.platformCommission ?? 5,
     };
     this.dealsMap.set(id, deal);
     return deal;
