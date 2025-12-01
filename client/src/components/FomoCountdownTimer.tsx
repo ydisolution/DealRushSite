@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
-import { Clock, AlertTriangle, Flame, Zap } from "lucide-react";
 
 interface FomoCountdownTimerProps {
   endTime: Date | string;
@@ -17,8 +16,6 @@ interface TimeLeft {
   seconds: number;
 }
 
-type TimeStatus = "safe" | "warning" | "urgent" | "critical";
-
 export default function FomoCountdownTimer({ 
   endTime: endTimeProp, 
   size = "md",
@@ -30,7 +27,7 @@ export default function FomoCountdownTimer({
   }, [endTimeProp]);
 
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  const [status, setStatus] = useState<TimeStatus>("safe");
+  const [isFlipping, setIsFlipping] = useState(false);
 
   useEffect(() => {
     const calculateTimeLeft = () => {
@@ -39,19 +36,6 @@ export default function FomoCountdownTimer({
       if (difference <= 0) {
         onExpire?.();
         return { days: 0, hours: 0, minutes: 0, seconds: 0 };
-      }
-
-      const totalDays = difference / (1000 * 60 * 60 * 24);
-      const totalSeconds = difference / 1000;
-
-      if (totalSeconds <= 60) {
-        setStatus("critical");
-      } else if (totalDays < 1) {
-        setStatus("urgent");
-      } else if (totalDays <= 3) {
-        setStatus("warning");
-      } else {
-        setStatus("safe");
       }
 
       return {
@@ -64,6 +48,8 @@ export default function FomoCountdownTimer({
 
     setTimeLeft(calculateTimeLeft());
     const timer = setInterval(() => {
+      setIsFlipping(true);
+      setTimeout(() => setIsFlipping(false), 150);
       setTimeLeft(calculateTimeLeft());
     }, 1000);
 
@@ -81,142 +67,87 @@ export default function FomoCountdownTimer({
   const sizeClasses = {
     sm: {
       container: "gap-2",
-      box: "w-14 h-16",
-      number: "text-xl",
+      box: "w-12 h-14",
+      number: "text-lg",
       label: "text-[9px]",
-      message: "text-xs",
-      icon: "h-4 w-4",
+      separator: "text-lg",
     },
     md: {
       container: "gap-3",
-      box: "w-18 h-20",
+      box: "w-16 h-20",
       number: "text-2xl",
       label: "text-[10px]",
-      message: "text-sm",
-      icon: "h-5 w-5",
+      separator: "text-xl",
     },
     lg: {
       container: "gap-4",
-      box: "w-22 h-24",
+      box: "w-20 h-24",
       number: "text-3xl",
       label: "text-xs",
-      message: "text-base",
-      icon: "h-6 w-6",
-    },
-  };
-
-  const statusConfig = {
-    safe: {
-      gradient: "from-emerald-500 to-teal-600",
-      bgGlow: "shadow-emerald-500/30",
-      textColor: "text-emerald-50",
-      labelColor: "text-emerald-200",
-      message: "יש לכם זמן - אבל אל תפספסו!",
-      Icon: Clock,
-      pulse: false,
-      shake: false,
-    },
-    warning: {
-      gradient: "from-amber-500 to-orange-600",
-      bgGlow: "shadow-amber-500/40",
-      textColor: "text-amber-50",
-      labelColor: "text-amber-200",
-      message: "הזמן הולך ואוזל!",
-      Icon: AlertTriangle,
-      pulse: false,
-      shake: false,
-    },
-    urgent: {
-      gradient: "from-orange-500 to-red-600",
-      bgGlow: "shadow-orange-500/50",
-      textColor: "text-orange-50",
-      labelColor: "text-orange-200",
-      message: "מהרו! נשארו פחות מ-24 שעות!",
-      Icon: Flame,
-      pulse: true,
-      shake: false,
-    },
-    critical: {
-      gradient: "from-red-500 to-rose-700",
-      bgGlow: "shadow-red-500/60",
-      textColor: "text-red-50",
-      labelColor: "text-red-200",
-      message: "הדיל נסגר עכשיו!",
-      Icon: Zap,
-      pulse: true,
-      shake: true,
+      separator: "text-2xl",
     },
   };
 
   const classes = sizeClasses[size];
-  const config = statusConfig[status];
-  const StatusIcon = config.Icon;
 
-  const TimeUnit = ({ value, label }: { value: number; label: string }) => (
-    <div 
-      className={`
-        ${classes.box} 
-        flex flex-col items-center justify-center 
-        bg-gradient-to-b ${config.gradient}
-        rounded-xl
-        shadow-lg ${config.bgGlow}
-        ${config.pulse ? "animate-pulse" : ""}
-        transition-all duration-300
-        border border-white/20
-      `}
-    >
-      <span className={`${classes.number} font-black ${config.textColor} tabular-nums drop-shadow-lg`}>
-        {String(value).padStart(2, "0")}
-      </span>
-      <span className={`${classes.label} font-medium ${config.labelColor} uppercase tracking-wider`}>
+  const TimeUnit = ({ value, label, isSeconds = false }: { value: number; label: string; isSeconds?: boolean }) => (
+    <div className="flex flex-col items-center gap-1">
+      <div 
+        className={`
+          ${classes.box} 
+          flex items-center justify-center 
+          bg-card
+          rounded-xl
+          border border-border
+          shadow-sm
+          relative
+          overflow-hidden
+        `}
+      >
+        <span 
+          className={`
+            ${classes.number} 
+            font-bold 
+            text-foreground 
+            tabular-nums
+            transition-all duration-150 ease-out
+            ${isSeconds && isFlipping ? "scale-110 text-primary" : "scale-100"}
+          `}
+        >
+          {String(value).padStart(2, "0")}
+        </span>
+        <div className="absolute inset-x-0 top-1/2 h-px bg-border/30" />
+      </div>
+      <span className={`${classes.label} font-medium text-muted-foreground uppercase tracking-wide`}>
         {label}
       </span>
     </div>
   );
 
   const Separator = () => (
-    <div className={`flex flex-col justify-center gap-1.5 ${config.pulse ? "animate-pulse" : ""}`}>
-      <div className={`w-2 h-2 rounded-full bg-gradient-to-b ${config.gradient} shadow-lg`} />
-      <div className={`w-2 h-2 rounded-full bg-gradient-to-b ${config.gradient} shadow-lg`} />
+    <div className={`flex items-center justify-center h-14 ${classes.separator} font-light text-muted-foreground/50`}>
+      :
     </div>
   );
 
   return (
-    <div 
-      className={`flex flex-col items-center gap-4 ${config.shake ? "animate-[shake_0.5s_ease-in-out_infinite]" : ""}`} 
-      data-testid="fomo-countdown-timer"
-    >
-      <div className={`flex items-center gap-2 ${classes.message} font-bold`}>
-        <StatusIcon className={`${classes.icon} ${config.pulse ? "animate-bounce" : ""}`} />
-        <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
-          {config.message}
-        </span>
-      </div>
-      
-      <div className={`flex items-center ${classes.container}`} dir="ltr">
+    <div className="flex flex-col items-center gap-4" data-testid="fomo-countdown-timer">
+      <div className={`flex items-start ${classes.container}`} dir="ltr">
         <TimeUnit value={timeLeft.days} label="ימים" />
         <Separator />
         <TimeUnit value={timeLeft.hours} label="שעות" />
         <Separator />
         <TimeUnit value={timeLeft.minutes} label="דקות" />
         <Separator />
-        <TimeUnit value={timeLeft.seconds} label="שניות" />
+        <TimeUnit value={timeLeft.seconds} label="שניות" isSeconds />
       </div>
       
       {showEndDate && formattedEndDate && (
         <div className="text-sm text-muted-foreground text-center" dir="rtl">
           <span>נסגר ב-</span>
-          <span className="font-semibold">{formattedEndDate}</span>
+          <span className="font-medium">{formattedEndDate}</span>
         </div>
       )}
-
-      <style>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-2px); }
-          75% { transform: translateX(2px); }
-        }
-      `}</style>
     </div>
   );
 }
