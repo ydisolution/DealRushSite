@@ -14,6 +14,7 @@ import type { User } from "@shared/schema";
 import MemoryStore from "memorystore";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
+import { dealClosureService } from "./dealClosureService";
 
 const MemoryStoreSession = MemoryStore(session);
 
@@ -729,6 +730,21 @@ export async function registerRoutes(
         newParticipantCount,
         newCurrentPrice
       );
+
+      const previousCount = existingParticipants.length;
+      const previousTierIndex = previousCount > 0 
+        ? deal.tiers.findIndex(t => previousCount >= t.minParticipants && previousCount <= t.maxParticipants)
+        : -1;
+      
+      if (newTierIndex !== -1 && newTierIndex > previousTierIndex) {
+        const oldPrice = previousTierIndex >= 0 
+          ? (deal.tiers[previousTierIndex].price || Math.round(deal.originalPrice * (1 - deal.tiers[previousTierIndex].discount / 100)))
+          : deal.originalPrice;
+        
+        dealClosureService.notifyTierUnlocked(deal, newTierIndex, oldPrice, newCurrentPrice).catch(err => {
+          console.error("Failed to notify tier unlock:", err);
+        });
+      }
 
       const participantEmail = email || user.email;
       if (participantEmail) {

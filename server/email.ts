@@ -274,3 +274,177 @@ export async function sendDealClosedNotification(
     htmlBody,
   });
 }
+
+export async function sendDealCancelledNotification(
+  toEmail: string,
+  dealName: string,
+  reason: string
+): Promise<boolean> {
+  const subject = `הדיל בוטל: ${dealName}`;
+  
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html dir="rtl" lang="he">
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: 'Rubik', 'Heebo', Arial, sans-serif; direction: rtl; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
+        .info-box { background: white; padding: 15px; border-radius: 8px; margin: 15px 0; text-align: center; }
+        .notice { background: #fef2f2; color: #dc2626; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>DealRush</h1>
+          <p>הדיל בוטל</p>
+        </div>
+        <div class="content">
+          <h2>${dealName}</h2>
+          <div class="notice">
+            <p><strong>סיבת הביטול:</strong></p>
+            <p>${reason}</p>
+          </div>
+          <div class="info-box">
+            <p><strong>חדשות טובות!</strong></p>
+            <p>לא חויבת בגין דיל זה. הכרטיס שלך לא נפגע.</p>
+          </div>
+          <p>אנחנו מזמינים אותך לבדוק דילים נוספים באתר!</p>
+        </div>
+        <div class="footer">
+          <p>תודה שבחרת ב-DealRush</p>
+          <p>קניות קבוצתיות חכמות</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  return sendEmail({
+    to: toEmail,
+    subject,
+    htmlBody,
+  });
+}
+
+export async function sendTierUnlockedNotification(
+  toEmail: string,
+  dealName: string,
+  tierNumber: number,
+  oldPrice: number,
+  newPrice: number,
+  discountPercent: number
+): Promise<boolean> {
+  const savings = oldPrice - newPrice;
+  const subject = `שלב חדש נפתח! ${dealName}`;
+  
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html dir="rtl" lang="he">
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: 'Rubik', 'Heebo', Arial, sans-serif; direction: rtl; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
+        .tier-badge { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 10px 25px; border-radius: 25px; display: inline-block; font-weight: bold; font-size: 18px; margin: 10px 0; }
+        .price-old { font-size: 18px; color: #999; text-decoration: line-through; }
+        .price-new { font-size: 36px; color: #d97706; font-weight: bold; }
+        .savings { background: #fef3c7; color: #d97706; padding: 10px 20px; border-radius: 20px; display: inline-block; font-weight: bold; margin: 10px 0; }
+        .info-box { background: white; padding: 20px; border-radius: 8px; margin: 15px 0; text-align: center; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>DealRush</h1>
+          <p>שלב הנחה חדש נפתח!</p>
+        </div>
+        <div class="content">
+          <h2>${dealName}</h2>
+          <div class="info-box">
+            <p class="tier-badge">שלב ${tierNumber}</p>
+            <p class="price-old">₪${oldPrice.toLocaleString()}</p>
+            <p class="price-new">₪${newPrice.toLocaleString()}</p>
+            <p class="savings">${discountPercent}% הנחה - חוסכים ₪${savings.toLocaleString()}!</p>
+          </div>
+          <p>ככל שיותר אנשים מצטרפים, ההנחה גדלה! שתף את הדיל עם חברים כדי לחסוך עוד יותר.</p>
+        </div>
+        <div class="footer">
+          <p>תודה שבחרת ב-DealRush</p>
+          <p>קניות קבוצתיות חכמות</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  return sendEmail({
+    to: toEmail,
+    subject,
+    htmlBody,
+  });
+}
+
+export async function sendPaymentChargedNotification(
+  toEmail: string,
+  dealName: string,
+  amount: number,
+  cardLast4: string
+): Promise<boolean> {
+  const subject = `אישור תשלום: ${dealName}`;
+  
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html dir="rtl" lang="he">
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: 'Rubik', 'Heebo', Arial, sans-serif; direction: rtl; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
+        .checkmark { font-size: 48px; margin-bottom: 10px; }
+        .amount { font-size: 36px; color: #22c55e; font-weight: bold; }
+        .info-box { background: white; padding: 20px; border-radius: 8px; margin: 15px 0; text-align: center; }
+        .card-info { background: #f3f4f6; padding: 10px 15px; border-radius: 8px; display: inline-block; margin-top: 10px; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="checkmark">✓</div>
+          <h1>DealRush</h1>
+          <p>התשלום בוצע בהצלחה!</p>
+        </div>
+        <div class="content">
+          <h2>${dealName}</h2>
+          <div class="info-box">
+            <p><strong>סכום ששולם:</strong></p>
+            <p class="amount">₪${amount.toLocaleString()}</p>
+            <p class="card-info">כרטיס אשראי המסתיים ב-${cardLast4}</p>
+          </div>
+          <p>תודה על הרכישה! נציג יצור איתך קשר בקרוב לתיאום המשלוח.</p>
+        </div>
+        <div class="footer">
+          <p>תודה שבחרת ב-DealRush</p>
+          <p>קניות קבוצתיות חכמות</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  return sendEmail({
+    to: toEmail,
+    subject,
+    htmlBody,
+  });
+}

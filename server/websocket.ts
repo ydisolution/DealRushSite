@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server } from "http";
 
-interface NotificationMessage {
+interface ParticipantJoinedMessage {
   type: "participant_joined";
   dealId: string;
   dealName: string;
@@ -9,6 +9,37 @@ interface NotificationMessage {
   newParticipantCount: number;
   newPrice: number;
 }
+
+interface DealCancelledMessage {
+  type: "deal_cancelled";
+  dealId: string;
+  dealName: string;
+  reason: string;
+}
+
+interface DealClosedMessage {
+  type: "deal_closed";
+  dealId: string;
+  dealName: string;
+  finalPrice: number;
+  participantCount: number;
+}
+
+interface TierUnlockedMessage {
+  type: "tier_unlocked";
+  dealId: string;
+  dealName: string;
+  tierNumber: number;
+  oldPrice: number;
+  newPrice: number;
+  discountPercent: number;
+}
+
+type NotificationMessage = 
+  | ParticipantJoinedMessage
+  | DealCancelledMessage
+  | DealClosedMessage
+  | TierUnlockedMessage;
 
 class NotificationService {
   private wss: WebSocketServer | null = null;
