@@ -603,7 +603,7 @@ function DealForm({
   );
 }
 
-export default function AdminPage() {
+function AdminContentPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
