@@ -208,13 +208,18 @@ export async function createAdminUser() {
   const adminEmail = "admin@dealrush.co.il";
   const adminPassword = "DealRush2024!";
   
+  const passwordHash = await hashPassword(adminPassword);
+  
   const existingAdmin = await storage.getUserByEmail(adminEmail);
   if (existingAdmin) {
-    console.log("Admin user already exists:", adminEmail);
+    await storage.updateUser(existingAdmin.id, {
+      passwordHash,
+      isAdmin: "true",
+      isEmailVerified: "true",
+    });
+    console.log("Admin user password updated:", adminEmail);
     return existingAdmin;
   }
-  
-  const passwordHash = await hashPassword(adminPassword);
   
   const admin = await storage.upsertUser({
     email: adminEmail,
