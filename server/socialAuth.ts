@@ -51,9 +51,12 @@ export async function setupGoogleAuth(app: Express) {
     return false;
   }
   
-  const callbackURL = process.env.NODE_ENV === "production" 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN || process.env.REPL_SLUG + "." + process.env.REPL_OWNER + ".repl.co"}/api/auth/google/callback`
+  const replitDomain = process.env.REPLIT_DEV_DOMAIN;
+  const callbackURL = replitDomain 
+    ? `https://${replitDomain}/api/auth/google/callback`
     : "http://localhost:5000/api/auth/google/callback";
+  
+  console.log("Google OAuth callback URL:", callbackURL);
   
   passport.use(new GoogleStrategy({
     clientID,
@@ -117,9 +120,12 @@ export async function setupFacebookAuth(app: Express) {
     return false;
   }
   
-  const callbackURL = process.env.NODE_ENV === "production"
-    ? `https://${process.env.REPLIT_DEV_DOMAIN || process.env.REPL_SLUG + "." + process.env.REPL_OWNER + ".repl.co"}/api/auth/facebook/callback`
+  const replitDomain = process.env.REPLIT_DEV_DOMAIN;
+  const callbackURL = replitDomain 
+    ? `https://${replitDomain}/api/auth/facebook/callback`
     : "http://localhost:5000/api/auth/facebook/callback";
+  
+  console.log("Facebook OAuth callback URL:", callbackURL);
   
   passport.use(new FacebookStrategy({
     clientID,
