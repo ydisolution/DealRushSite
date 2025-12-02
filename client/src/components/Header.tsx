@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Zap, Menu, User, ShoppingBag, Bell } from "lucide-react";
+import { Zap, Menu, User, ShoppingBag, Bell, Settings } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -79,6 +79,13 @@ export default function Header({
         <div className="flex items-center gap-2">
           {isLoggedIn ? (
             <>
+              {user?.isAdmin === "true" && (
+                <Link href="/admin">
+                  <Button variant="ghost" size="icon" data-testid="button-admin" title="ניהול">
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                </Link>
+              )}
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -96,7 +103,7 @@ export default function Header({
                 )}
               </Button>
               <Link href="/dashboard">
-                <Button variant="ghost" size="icon" data-testid="button-dashboard">
+                <Button variant="ghost" size="icon" data-testid="button-dashboard" title="האזור שלי">
                   <ShoppingBag className="h-5 w-5" />
                 </Button>
               </Link>

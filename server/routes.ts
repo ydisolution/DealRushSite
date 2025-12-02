@@ -15,7 +15,7 @@ import MemoryStore from "memorystore";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { dealClosureService } from "./dealClosureService";
-import { setupSocialAuth } from "./replitAuth";
+import { setupSocialAuth, createAdminUser } from "./socialAuth";
 import { db } from "./db";
 
 const MemoryStoreSession = MemoryStore(session);
@@ -98,8 +98,11 @@ export async function registerRoutes(
     },
   }));
   
-  // Setup Social Auth (Google, Apple, etc. via Replit OIDC)
+  // Setup Social Auth (Google, Facebook)
   await setupSocialAuth(app);
+  
+  // Create admin user on startup
+  await createAdminUser();
   
   app.use("/uploads", (req, res, next) => {
     const filePath = path.join(uploadDir, req.path);

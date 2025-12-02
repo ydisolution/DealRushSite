@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { Switch, Route } from "wouter";
+import { useState, useEffect } from "react";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import AuthModal from "@/components/AuthModal";
@@ -58,8 +59,31 @@ function AppContent() {
   const { isAuthenticated, isLoading, user, logout } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState<"login" | "register">("login");
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
   useNotifications();
   const notificationCount = isAuthenticated ? 2 : 0;
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const authStatus = urlParams.get("auth");
+    
+    if (authStatus === "success") {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({
+        title: "התחברת בהצלחה!",
+        description: "ברוכים הבאים",
+      });
+      window.history.replaceState({}, "", "/");
+    } else if (authStatus === "failed") {
+      toast({
+        title: "שגיאה בהתחברות",
+        description: "אנא נסה שוב",
+        variant: "destructive",
+      });
+      window.history.replaceState({}, "", "/");
+    }
+  }, [toast]);
 
   const handleOpenAuth = (tab: "login" | "register" = "login") => {
     setAuthModalTab(tab);

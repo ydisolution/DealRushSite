@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Mail, Lock, User, Phone, ArrowRight, Zap } from "lucide-react";
-import { SiGoogle, SiApple, SiFacebook } from "react-icons/si";
+import { SiGoogle, SiFacebook } from "react-icons/si";
+import { useQuery } from "@tanstack/react-query";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -100,54 +101,67 @@ export default function AuthModal({ isOpen, onClose, defaultTab = "login" }: Aut
     }
   };
 
-  const handleSocialLogin = () => {
-    window.location.href = "/api/social/login";
+  const { data: providers } = useQuery<{ google: boolean; facebook: boolean }>({
+    queryKey: ["/api/auth/providers"],
+  });
+
+  const handleGoogleLogin = () => {
+    window.location.href = "/api/auth/google";
   };
 
-  const SocialLoginButtons = () => (
-    <div className="space-y-3">
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t" />
+  const handleFacebookLogin = () => {
+    window.location.href = "/api/auth/facebook";
+  };
+
+  const SocialLoginButtons = () => {
+    const hasProviders = providers?.google || providers?.facebook;
+    
+    if (!hasProviders) {
+      return null;
+    }
+    
+    return (
+      <div className="space-y-3">
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+              או המשך עם
+            </span>
+          </div>
         </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">
-            או המשך עם
-          </span>
+        
+        <div className={`grid gap-3 ${providers?.google && providers?.facebook ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {providers?.google && (
+            <Button 
+              type="button"
+              variant="outline" 
+              className="w-full flex items-center gap-2"
+              onClick={handleGoogleLogin}
+              data-testid="button-social-google"
+            >
+              <SiGoogle className="h-4 w-4" />
+              <span>Google</span>
+            </Button>
+          )}
+          {providers?.facebook && (
+            <Button 
+              type="button"
+              variant="outline" 
+              className="w-full flex items-center gap-2"
+              onClick={handleFacebookLogin}
+              data-testid="button-social-facebook"
+            >
+              <SiFacebook className="h-4 w-4" />
+              <span>Facebook</span>
+            </Button>
+          )}
         </div>
       </div>
-      
-      <div className="grid grid-cols-3 gap-3">
-        <Button 
-          type="button"
-          variant="outline" 
-          className="w-full"
-          onClick={handleSocialLogin}
-          data-testid="button-social-google"
-        >
-          <SiGoogle className="h-4 w-4" />
-        </Button>
-        <Button 
-          type="button"
-          variant="outline" 
-          className="w-full"
-          onClick={handleSocialLogin}
-          data-testid="button-social-apple"
-        >
-          <SiApple className="h-4 w-4" />
-        </Button>
-        <Button 
-          type="button"
-          variant="outline" 
-          className="w-full"
-          onClick={handleSocialLogin}
-          data-testid="button-social-facebook"
-        >
-          <SiFacebook className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
