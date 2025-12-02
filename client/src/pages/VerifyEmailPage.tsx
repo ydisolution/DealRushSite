@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
@@ -25,13 +26,19 @@ export default function VerifyEmailPage() {
     verifyEmail({ token, userId })
       .then(() => {
         setStatus("success");
-        setMessage("המייל אומת בהצלחה!");
+        setMessage("המייל אומת בהצלחה! מעביר אותך לדף הבית...");
+        // Invalidate and refetch user data to update auth state
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        // Redirect to home after a short delay
+        setTimeout(() => {
+          setLocation("/");
+        }, 2000);
       })
       .catch((err) => {
         setStatus("error");
         setMessage(err?.message || "אירעה שגיאה באימות המייל");
       });
-  }, [verifyEmail]);
+  }, [verifyEmail, setLocation]);
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-4" dir="rtl">
@@ -60,10 +67,16 @@ export default function VerifyEmailPage() {
         </CardHeader>
         <CardContent className="text-center space-y-4">
           <p className="text-muted-foreground">{message}</p>
-          {status !== "loading" && (
+          {status === "error" && (
             <Button onClick={() => setLocation("/")} data-testid="button-back-home">
               חזרה לדף הבית
             </Button>
+          )}
+          {status === "success" && (
+            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>מעביר אותך...</span>
+            </div>
           )}
         </CardContent>
       </Card>

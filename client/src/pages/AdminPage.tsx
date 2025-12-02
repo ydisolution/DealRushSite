@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
@@ -29,14 +30,50 @@ import {
   DollarSign,
   Layers,
   X,
-  Check,
   AlertCircle,
   CreditCard,
   Building,
-  Receipt
+  Receipt,
+  TrendingUp,
+  BarChart3,
+  UserPlus,
+  ShoppingCart,
+  Wallet,
+  Clock
 } from "lucide-react";
 import type { Deal } from "@shared/schema";
 import { CATEGORIES } from "@shared/schema";
+
+interface AnalyticsData {
+  summary: {
+    activeDeals: number;
+    closedDeals: number;
+    totalDeals: number;
+    newRegistrations: number;
+    totalUsers: number;
+    unitsSold: number;
+    totalParticipants: number;
+    totalRevenue: number;
+    platformProfit: number;
+  };
+  vendorPayouts: Array<{
+    dealId: string;
+    dealName: string;
+    supplierName: string | null;
+    totalRevenue: number;
+    platformCommission: number;
+    vendorAmount: number;
+    participantCount: number;
+    status: string;
+  }>;
+  dailyStats: Array<{
+    date: string;
+    registrations: number;
+    participants: number;
+    revenue: number;
+  }>;
+  range: string;
+}
 
 const tierSchema = z.object({
   minParticipants: z.number().min(0),
@@ -603,10 +640,243 @@ function DealForm({
   );
 }
 
+function AnalyticsDashboard() {
+  const [range, setRange] = useState<string>("30d");
+  
+  const { data: analytics, isLoading } = useQuery<AnalyticsData>({
+    queryKey: ["/api/admin/analytics", range],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map(i => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-4">
+                <div className="h-4 bg-muted rounded w-1/2 mb-2" />
+                <div className="h-8 bg-muted rounded w-1/3" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const summary = analytics?.summary || {
+    activeDeals: 0,
+    closedDeals: 0,
+    totalDeals: 0,
+    newRegistrations: 0,
+    totalUsers: 0,
+    unitsSold: 0,
+    totalParticipants: 0,
+    totalRevenue: 0,
+    platformProfit: 0,
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">סטטיסטיקות ודוחות</h2>
+        <Select value={range} onValueChange={setRange}>
+          <SelectTrigger className="w-40" data-testid="select-analytics-range">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="today">היום</SelectItem>
+            <SelectItem value="7d">שבוע אחרון</SelectItem>
+            <SelectItem value="30d">חודש אחרון</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card data-testid="stat-active-deals">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-primary/10">
+                <Package className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">דילים פעילים</p>
+                <p className="text-2xl font-bold">{summary.activeDeals}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="stat-new-registrations">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-success/10">
+                <UserPlus className="h-6 w-6 text-success" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">הרשמות חדשות</p>
+                <p className="text-2xl font-bold">{summary.newRegistrations}</p>
+                <p className="text-xs text-muted-foreground">סה"כ: {summary.totalUsers}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="stat-units-sold">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-accent/30">
+                <ShoppingCart className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">יחידות שנמכרו</p>
+                <p className="text-2xl font-bold">{summary.unitsSold}</p>
+                <p className="text-xs text-muted-foreground">הצטרפויות: {summary.totalParticipants}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="stat-total-revenue">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-success/10">
+                <DollarSign className="h-6 w-6 text-success" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">הכנסות</p>
+                <p className="text-2xl font-bold text-success">₪{summary.totalRevenue.toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card data-testid="stat-platform-profit">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Wallet className="h-5 w-5" />
+              רווח הפלטפורמה
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-4xl font-bold text-success">₪{summary.platformProfit.toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              עמלות מצטברות מכל הדילים
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="stat-deals-summary">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <BarChart3 className="h-5 w-5" />
+              סיכום דילים
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">דילים פעילים</span>
+              <Badge variant="default">{summary.activeDeals}</Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">דילים שנסגרו</span>
+              <Badge variant="secondary">{summary.closedDeals}</Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">סה"כ דילים</span>
+              <Badge variant="outline">{summary.totalDeals}</Badge>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {analytics?.vendorPayouts && analytics.vendorPayouts.length > 0 && (
+        <Card data-testid="vendor-payouts">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Building className="h-5 w-5" />
+              תשלומים לספקים
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {analytics.vendorPayouts.map((payout, index) => (
+                <div key={payout.dealId} className="flex items-center justify-between p-3 bg-muted/50 rounded-md" data-testid={`vendor-payout-${index}`}>
+                  <div className="space-y-1">
+                    <p className="font-medium">{payout.dealName}</p>
+                    <p className="text-sm text-muted-foreground">ספק: {payout.supplierName || "לא הוגדר"}</p>
+                    <p className="text-xs text-muted-foreground">{payout.participantCount} משתתפים</p>
+                  </div>
+                  <div className="text-left space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">הכנסה:</span>
+                      <span className="font-medium">₪{payout.totalRevenue.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">עמלה:</span>
+                      <span className="font-medium text-success">₪{payout.platformCommission.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">לספק:</span>
+                      <span className="font-medium">₪{payout.vendorAmount.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <Badge variant={payout.status === 'paid' ? 'default' : 'secondary'}>
+                    {payout.status === 'paid' ? 'שולם' : 'ממתין'}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {analytics?.dailyStats && analytics.dailyStats.length > 0 && (
+        <Card data-testid="daily-chart">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="h-5 w-5" />
+              מגמות יומיות
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {analytics.dailyStats.slice(-7).map((day, index) => (
+                <div key={day.date} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded" data-testid={`daily-stat-${index}`}>
+                  <span className="text-sm font-medium">
+                    {new Date(day.date).toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  </span>
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-1">
+                      <UserPlus className="h-3 w-3 text-muted-foreground" />
+                      <span>{day.registrations}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users className="h-3 w-3 text-muted-foreground" />
+                      <span>{day.participants}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <DollarSign className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-success">₪{day.revenue.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function AdminContentPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
+  const [activeTab, setActiveTab] = useState("deals");
 
   const { data: deals = [], isLoading } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
@@ -647,203 +917,235 @@ function AdminContentPage() {
     <div className="container mx-auto py-8 px-4" dir="rtl" data-testid="admin-page">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold">ניהול עסקאות</h1>
-          <p className="text-muted-foreground mt-1">הוסף, ערוך ונהל את העסקאות באתר</p>
+          <h1 className="text-3xl font-bold">ניהול האתר</h1>
+          <p className="text-muted-foreground mt-1">נהל את העסקאות, צפה בסטטיסטיקות ובתשלומים</p>
         </div>
-        
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="lg" className="gap-2" data-testid="button-new-deal">
-              <Plus className="h-5 w-5" />
-              עסקה חדשה
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" dir="rtl">
-            <DialogHeader>
-              <DialogTitle>{editingDeal ? "עריכת עסקה" : "יצירת עסקה חדשה"}</DialogTitle>
-            </DialogHeader>
-            <DealForm 
-              deal={editingDeal || undefined} 
-              onSuccess={handleDialogClose}
-              onCancel={handleDialogClose}
-            />
-          </DialogContent>
-        </Dialog>
       </div>
 
-      {!isLoading && deals.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-3 mb-8">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-full bg-primary/10">
-                  <Package className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">סה"כ דילים</p>
-                  <p className="text-2xl font-bold">{deals.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-full bg-success/10">
-                  <Users className="h-6 w-6 text-success" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">סה"כ משתתפים</p>
-                  <p className="text-2xl font-bold">{deals.reduce((sum, d) => sum + d.participants, 0)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-full bg-accent/30">
-                  <Receipt className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">עמלות משוערות</p>
-                  <p className="text-2xl font-bold text-success">
-                    ₪{deals.reduce((sum, d) => {
-                      if (d.platformCommission && d.participants > 0) {
-                        return sum + Math.round(d.currentPrice * d.participants * (d.platformCommission / 100));
-                      }
-                      return sum;
-                    }, 0).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="deals" className="gap-2" data-testid="tab-deals">
+            <Package className="h-4 w-4" />
+            ניהול דילים
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="gap-2" data-testid="tab-analytics">
+            <BarChart3 className="h-4 w-4" />
+            סטטיסטיקות
+          </TabsTrigger>
+        </TabsList>
 
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map(i => (
-            <Card key={i} className="animate-pulse">
-              <div className="h-40 bg-muted rounded-t-lg" />
-              <CardContent className="p-4 space-y-3">
-                <div className="h-5 bg-muted rounded w-3/4" />
-                <div className="h-4 bg-muted rounded w-1/2" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : deals.length === 0 ? (
-        <Card className="p-12 text-center">
-          <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">אין עסקאות עדיין</h3>
-          <p className="text-muted-foreground mb-4">התחל על ידי יצירת העסקה הראשונה שלך</p>
-          <Button onClick={() => setIsDialogOpen(true)} data-testid="button-create-first-deal">
-            <Plus className="h-4 w-4 ml-2" />
-            צור עסקה ראשונה
-          </Button>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {deals.map((deal) => (
-            <Card key={deal.id} className="overflow-hidden" data-testid={`admin-deal-card-${deal.id}`}>
-              <div className="relative h-40 bg-muted">
-                {deal.images[0] ? (
-                  <img 
-                    src={deal.images[0]} 
-                    alt={deal.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <ImageIcon className="h-12 w-12 text-muted-foreground" />
-                  </div>
-                )}
-                <Badge className="absolute top-2 right-2">
-                  {getCategoryName(deal.category)}
-                </Badge>
-              </div>
-              
-              <CardContent className="p-4 space-y-3">
-                <h3 className="font-semibold line-clamp-1">{deal.name}</h3>
-                
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <DollarSign className="h-4 w-4" />
-                    <span>₪{deal.currentPrice.toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Users className="h-4 w-4" />
-                    <span>{deal.participants}/{deal.targetParticipants}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>{new Date(deal.endTime).toLocaleDateString("he-IL")}</span>
-                  </div>
-                </div>
+        <TabsContent value="deals">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold">עסקאות</h2>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="lg" className="gap-2" data-testid="button-new-deal">
+                  <Plus className="h-5 w-5" />
+                  עסקה חדשה
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" dir="rtl">
+                <DialogHeader>
+                  <DialogTitle>{editingDeal ? "עריכת עסקה" : "יצירת עסקה חדשה"}</DialogTitle>
+                </DialogHeader>
+                <DealForm 
+                  deal={editingDeal || undefined} 
+                  onSuccess={handleDialogClose}
+                  onCancel={handleDialogClose}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
 
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="text-xs">
-                    {deal.tiers.length} מדרגות
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    עד {Math.max(...deal.tiers.map(t => t.discount))}% הנחה
-                  </Badge>
-                  {deal.platformCommission && (
-                    <Badge variant="secondary" className="text-xs">
-                      {deal.platformCommission}% עמלה
-                    </Badge>
-                  )}
-                </div>
-                
-                {deal.supplierName && (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Building className="h-3.5 w-3.5" />
-                    <span>ספק: {deal.supplierName}</span>
-                  </div>
-                )}
-                
-                {deal.platformCommission && deal.participants > 0 && (
-                  <div className="p-2 bg-muted rounded-md text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">עמלה משוערת:</span>
-                      <span className="font-semibold text-success">
-                        ₪{Math.round(deal.currentPrice * deal.participants * (deal.platformCommission / 100)).toLocaleString()}
-                      </span>
+          {!isLoading && deals.length > 0 && (
+            <div className="grid gap-4 md:grid-cols-3 mb-8">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-full bg-primary/10">
+                      <Package className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">סה"כ דילים</p>
+                      <p className="text-2xl font-bold">{deals.length}</p>
                     </div>
                   </div>
-                )}
-                
-                <Separator />
-                
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="flex-1 gap-1.5"
-                    onClick={() => handleEdit(deal)}
-                    data-testid={`button-edit-deal-${deal.id}`}
-                  >
-                    <Edit className="h-4 w-4" />
-                    ערוך
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="flex-1 gap-1.5 text-destructive hover:text-destructive"
-                    onClick={() => handleDelete(deal.id)}
-                    data-testid={`button-delete-deal-${deal.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    מחק
-                  </Button>
-                </div>
-              </CardContent>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-full bg-success/10">
+                      <Users className="h-6 w-6 text-success" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">סה"כ משתתפים</p>
+                      <p className="text-2xl font-bold">{deals.reduce((sum, d) => sum + d.participants, 0)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-full bg-accent/30">
+                      <Receipt className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">עמלות משוערות</p>
+                      <p className="text-2xl font-bold text-success">
+                        ₪{deals.reduce((sum, d) => {
+                          if (d.platformCommission && d.participants > 0) {
+                            return sum + Math.round(d.currentPrice * d.participants * (d.platformCommission / 100));
+                          }
+                          return sum;
+                        }, 0).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map(i => (
+                <Card key={i} className="animate-pulse">
+                  <div className="h-40 bg-muted rounded-t-lg" />
+                  <CardContent className="p-4 space-y-3">
+                    <div className="h-5 bg-muted rounded w-3/4" />
+                    <div className="h-4 bg-muted rounded w-1/2" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : deals.length === 0 ? (
+            <Card className="p-12 text-center">
+              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">אין עסקאות עדיין</h3>
+              <p className="text-muted-foreground mb-4">התחל על ידי יצירת העסקה הראשונה שלך</p>
+              <Button onClick={() => setIsDialogOpen(true)} data-testid="button-create-first-deal">
+                <Plus className="h-4 w-4 ml-2" />
+                צור עסקה ראשונה
+              </Button>
             </Card>
-          ))}
-        </div>
-      )}
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {deals.map((deal) => (
+                <Card key={deal.id} className="overflow-hidden" data-testid={`admin-deal-card-${deal.id}`}>
+                  <div className="relative h-40 bg-muted">
+                    {deal.images[0] ? (
+                      <img 
+                        src={deal.images[0]} 
+                        alt={deal.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                      </div>
+                    )}
+                    <Badge className="absolute top-2 right-2">
+                      {getCategoryName(deal.category)}
+                    </Badge>
+                    {deal.status && (
+                      <Badge 
+                        className="absolute top-2 left-2"
+                        variant={deal.status === 'active' ? 'default' : 'secondary'}
+                      >
+                        {deal.status === 'active' ? (
+                          <><Clock className="h-3 w-3 ml-1" />פעיל</>
+                        ) : deal.status === 'closed' ? 'נסגר' : deal.status}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <CardContent className="p-4 space-y-3">
+                    <h3 className="font-semibold line-clamp-1">{deal.name}</h3>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <DollarSign className="h-4 w-4" />
+                        <span>₪{deal.currentPrice.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        <span>{deal.participants}/{deal.targetParticipants}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
+                        <Calendar className="h-4 w-4" />
+                        <span>{new Date(deal.endTime).toLocaleDateString("he-IL")}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-xs">
+                        {deal.tiers.length} מדרגות
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        עד {Math.max(...deal.tiers.map(t => t.discount))}% הנחה
+                      </Badge>
+                      {deal.platformCommission && (
+                        <Badge variant="secondary" className="text-xs">
+                          {deal.platformCommission}% עמלה
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    {deal.supplierName && (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Building className="h-3.5 w-3.5" />
+                        <span>ספק: {deal.supplierName}</span>
+                      </div>
+                    )}
+                    
+                    {deal.platformCommission && deal.participants > 0 && (
+                      <div className="p-2 bg-muted rounded-md text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">עמלה משוערת:</span>
+                          <span className="font-semibold text-success">
+                            ₪{Math.round(deal.currentPrice * deal.participants * (deal.platformCommission / 100)).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <Separator />
+                    
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1 gap-1.5"
+                        onClick={() => handleEdit(deal)}
+                        data-testid={`button-edit-deal-${deal.id}`}
+                      >
+                        <Edit className="h-4 w-4" />
+                        ערוך
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1 gap-1.5 text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(deal.id)}
+                        data-testid={`button-delete-deal-${deal.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        מחק
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <AnalyticsDashboard />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

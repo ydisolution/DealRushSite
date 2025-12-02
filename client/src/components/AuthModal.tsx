@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Mail, Lock, User, Phone, ArrowRight, Zap } from "lucide-react";
+import { SiGoogle, SiApple, SiFacebook } from "react-icons/si";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -99,6 +100,55 @@ export default function AuthModal({ isOpen, onClose, defaultTab = "login" }: Aut
     }
   };
 
+  const handleSocialLogin = () => {
+    window.location.href = "/api/social/login";
+  };
+
+  const SocialLoginButtons = () => (
+    <div className="space-y-3">
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">
+            או המשך עם
+          </span>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-3 gap-3">
+        <Button 
+          type="button"
+          variant="outline" 
+          className="w-full"
+          onClick={handleSocialLogin}
+          data-testid="button-social-google"
+        >
+          <SiGoogle className="h-4 w-4" />
+        </Button>
+        <Button 
+          type="button"
+          variant="outline" 
+          className="w-full"
+          onClick={handleSocialLogin}
+          data-testid="button-social-apple"
+        >
+          <SiApple className="h-4 w-4" />
+        </Button>
+        <Button 
+          type="button"
+          variant="outline" 
+          className="w-full"
+          onClick={handleSocialLogin}
+          data-testid="button-social-facebook"
+        >
+          <SiFacebook className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md" dir="rtl" data-testid="auth-modal">
@@ -159,7 +209,9 @@ export default function AuthModal({ isOpen, onClose, defaultTab = "login" }: Aut
               <TabsTrigger value="register" data-testid="tab-register">הרשמה</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="login" className="mt-6">
+            <TabsContent value="login" className="mt-6 space-y-4">
+              <SocialLoginButtons />
+              
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="login-email">אימייל</Label>
@@ -218,7 +270,9 @@ export default function AuthModal({ isOpen, onClose, defaultTab = "login" }: Aut
               </form>
             </TabsContent>
 
-            <TabsContent value="register" className="mt-6">
+            <TabsContent value="register" className="mt-6 space-y-4">
+              <SocialLoginButtons />
+              
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">

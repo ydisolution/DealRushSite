@@ -2,7 +2,8 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
-import { insertDealSchema, insertParticipantSchema } from "@shared/schema";
+import { insertDealSchema, insertParticipantSchema, users } from "@shared/schema";
+import type { User, Participant } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -10,11 +11,12 @@ import fs from "fs";
 import { notificationService } from "./websocket";
 import { sendDealJoinNotification, sendPriceDropNotification, sendDealClosedNotification, sendEmail } from "./email";
 import { registerUser, loginUser, verifyEmailByUserId, requestPasswordReset, resetPassword, resendVerificationEmail } from "./auth";
-import type { User } from "@shared/schema";
 import MemoryStore from "memorystore";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { dealClosureService } from "./dealClosureService";
+import { setupSocialAuth } from "./replitAuth";
+import { db } from "./db";
 
 const MemoryStoreSession = MemoryStore(session);
 
@@ -95,6 +97,9 @@ export async function registerRoutes(
       maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   }));
+  
+  // Setup Social Auth (Google, Apple, etc. via Replit OIDC)
+  await setupSocialAuth(app);
   
   app.use("/uploads", (req, res, next) => {
     const filePath = path.join(uploadDir, req.path);
@@ -263,7 +268,22 @@ export async function registerRoutes(
         return res.status(400).json({ error: result.error });
       }
 
-      res.json({ message: "המייל אומת בהצלחה!" });
+      // Auto-login the user after email verification
+      req.session.userId = userId;
+      
+      const user = await storage.getUser(userId);
+
+      res.json({ 
+        message: "המייל אומת בהצלחה!",
+        user: user ? {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isEmailVerified: user.isEmailVerified,
+          isAdmin: user.isAdmin,
+        } : undefined
+      });
     } catch (error) {
       console.error("Email verification error:", error);
       res.status(500).json({ error: "שגיאה באימות המייל" });
@@ -769,6 +789,175 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error joining deal:", error);
       res.status(500).json({ error: "Failed to join deal" });
+    }
+  });
+
+  // Admin Analytics API
+  app.get("/api/admin/analytics", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const range = req.query.range as string || '30d';
+      
+      // Calculate date range
+      let fromDate = new Date();
+      const toDate = new Date();
+      
+      switch (range) {
+        case 'today':
+          fromDate.setHours(0, 0, 0, 0);
+          break;
+        case '7d':
+          fromDate.setDate(fromDate.getDate() - 7);
+          break;
+        case '30d':
+        default:
+          fromDate.setDate(fromDate.getDate() - 30);
+          break;
+      }
+
+      // Get all data for analytics
+      const allDeals = await storage.getDeals();
+      const allUsers = await db.select().from(users);
+      
+      // Get all participants with deal info
+      const allParticipants: Participant[] = [];
+      for (const deal of allDeals) {
+        const dealParticipants = await storage.getParticipantsByDeal(deal.id);
+        allParticipants.push(...dealParticipants);
+      }
+
+      // Filter by date range
+      const usersInRange = allUsers.filter(u => 
+        u.createdAt && new Date(u.createdAt) >= fromDate && new Date(u.createdAt) <= toDate
+      );
+
+      const participantsInRange = allParticipants.filter(p => 
+        p.joinedAt && new Date(p.joinedAt) >= fromDate && new Date(p.joinedAt) <= toDate
+      );
+
+      // Calculate metrics
+      const activeDeals = allDeals.filter(d => d.status === 'active' && d.isActive === 'true');
+      const closedDeals = allDeals.filter(d => d.status === 'closed' || d.status === 'completed');
+      
+      const totalRevenue = participantsInRange
+        .filter(p => p.paymentStatus === 'charged')
+        .reduce((sum, p) => sum + (p.chargedAmount || p.pricePaid), 0);
+
+      const platformProfit = allDeals.reduce((sum, deal) => {
+        const dealParticipants = allParticipants.filter(p => 
+          p.dealId === deal.id && 
+          p.paymentStatus === 'charged' &&
+          p.joinedAt && new Date(p.joinedAt) >= fromDate
+        );
+        const dealRevenue = dealParticipants.reduce((s, p) => s + (p.chargedAmount || p.pricePaid), 0);
+        const commission = deal.platformCommission || 5;
+        return sum + Math.round(dealRevenue * (commission / 100));
+      }, 0);
+
+      // Vendor payouts
+      const vendorPayouts = allDeals
+        .filter(d => d.supplierName && (d.status === 'closed' || d.status === 'completed'))
+        .map(deal => {
+          const dealParticipants = allParticipants.filter(p => 
+            p.dealId === deal.id && p.paymentStatus === 'charged'
+          );
+          const dealRevenue = dealParticipants.reduce((s, p) => s + (p.chargedAmount || p.pricePaid), 0);
+          const commission = deal.platformCommission || 5;
+          const vendorAmount = dealRevenue - Math.round(dealRevenue * (commission / 100));
+          
+          return {
+            dealId: deal.id,
+            dealName: deal.name,
+            supplierName: deal.supplierName,
+            totalRevenue: dealRevenue,
+            platformCommission: Math.round(dealRevenue * (commission / 100)),
+            vendorAmount,
+            participantCount: dealParticipants.length,
+            status: 'pending' as const,
+          };
+        });
+
+      // Daily stats for chart
+      const dailyStats: Array<{
+        date: string;
+        registrations: number;
+        participants: number;
+        revenue: number;
+      }> = [];
+      
+      const currentDate = new Date(fromDate);
+      while (currentDate <= toDate) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const dayStart = new Date(currentDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(currentDate);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        const dayRegs = allUsers.filter(u => {
+          if (!u.createdAt) return false;
+          const created = new Date(u.createdAt);
+          return created >= dayStart && created <= dayEnd;
+        }).length;
+        
+        const dayParticipants = allParticipants.filter(p => {
+          if (!p.joinedAt) return false;
+          const joined = new Date(p.joinedAt);
+          return joined >= dayStart && joined <= dayEnd;
+        });
+        
+        const dayRevenue = dayParticipants
+          .filter(p => p.paymentStatus === 'charged')
+          .reduce((sum, p) => sum + (p.chargedAmount || p.pricePaid), 0);
+        
+        dailyStats.push({
+          date: dateStr,
+          registrations: dayRegs,
+          participants: dayParticipants.length,
+          revenue: dayRevenue,
+        });
+        
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      res.json({
+        summary: {
+          activeDeals: activeDeals.length,
+          closedDeals: closedDeals.length,
+          totalDeals: allDeals.length,
+          newRegistrations: usersInRange.length,
+          totalUsers: allUsers.length,
+          unitsSold: participantsInRange.filter(p => p.paymentStatus === 'charged').length,
+          totalParticipants: participantsInRange.length,
+          totalRevenue,
+          platformProfit,
+        },
+        vendorPayouts,
+        dailyStats,
+        range,
+      });
+    } catch (error) {
+      console.error("Analytics error:", error);
+      res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
+  // Get all participants for admin
+  app.get("/api/admin/participants", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const allDeals = await storage.getDeals();
+      const allParticipants: Array<Participant & { dealName: string }> = [];
+      
+      for (const deal of allDeals) {
+        const dealParticipants = await storage.getParticipantsByDeal(deal.id);
+        allParticipants.push(...dealParticipants.map(p => ({
+          ...p,
+          dealName: deal.name,
+        })));
+      }
+      
+      res.json(allParticipants);
+    } catch (error) {
+      console.error("Error fetching participants:", error);
+      res.status(500).json({ error: "Failed to fetch participants" });
     }
   });
 

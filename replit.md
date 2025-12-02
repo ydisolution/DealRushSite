@@ -16,6 +16,10 @@ Preferred communication style: Simple, everyday language.
 
 **December 2024**:
 - Replaced Replit Auth with custom email/password authentication system
+- Added Social Login via Replit OIDC (supports Google, Apple, GitHub, X)
+  - Dual authentication: users can login via email/password OR social providers
+  - Social login automatically verifies email and merges with existing accounts
+  - setupSocialAuth function in server/replitAuth.ts
 - Integrated Stripe for payment processing with card validation before joining deals
 - Updated participants table to track payment status and Stripe payment method IDs
 - Added card validation requirement before users can join deals
@@ -34,6 +38,15 @@ Preferred communication style: Simple, everyday language.
 - Added WebSocket notifications for real-time updates:
   - deal_cancelled, deal_closed, tier_unlocked message types
 - Added idempotency guards to prevent duplicate deal processing
+- Added Admin Analytics Dashboard (AdminPage.tsx):
+  - Summary stats: active deals, closed deals, new registrations, total users
+  - Units sold tracking with participant counts
+  - Revenue and platform profit calculations
+  - Vendor payout tracking with commission breakdowns
+  - Daily statistics chart (registrations, participants, revenue)
+  - Date range filters (today, 7 days, 30 days)
+- Added animated video placeholder in "How it Works" section
+- Modern minimalist countdown timer design (removed aggressive FOMO messaging)
 
 ## System Architecture
 
@@ -78,6 +91,10 @@ Preferred communication style: Simple, everyday language.
 - DELETE `/api/deals/:id` - Delete deal (admin only)
 - POST `/api/deals/:id/join` - Join a deal (requires authentication and card validation)
 - POST `/api/upload` - Upload images (multer middleware)
+- GET `/api/admin/analytics` - Get analytics data with date range filter (admin only)
+- GET `/api/admin/participants` - Get all participants with deal names (admin only)
+- GET `/api/social/login` - Initiate OAuth social login via Replit OIDC
+- GET `/api/callback` - OAuth callback handler
 
 **Build System**: Custom esbuild configuration that bundles server code with selective dependency bundling (allowlist approach) to optimize cold start times.
 

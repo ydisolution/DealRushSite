@@ -5,12 +5,23 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Zap, Menu, User, ShoppingBag, Bell } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import type { User as UserType } from "@shared/schema";
+
+interface HeaderUser {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  isEmailVerified: string;
+  isAdmin: string | null;
+  profileImageUrl: string | null;
+  createdAt: string;
+}
 
 interface HeaderProps {
   isLoggedIn?: boolean;
   isLoading?: boolean;
-  user?: UserType | null;
+  user?: HeaderUser | null;
   notificationCount?: number;
   onLogin?: () => void;
   onRegister?: () => void;

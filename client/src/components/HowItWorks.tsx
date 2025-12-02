@@ -1,5 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, UserPlus, TrendingDown, CheckCircle } from "lucide-react";
+import { Search, UserPlus, TrendingDown, CheckCircle, Play, Users, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
 interface Step {
   icon: typeof Search;
@@ -30,11 +32,88 @@ const steps: Step[] = [
   },
 ];
 
+function AnimatedVideoPlaceholder() {
+  const [isHovered, setIsHovered] = useState(false);
+  
+  return (
+    <div 
+      className="relative rounded-xl overflow-hidden bg-gradient-to-br from-primary/10 via-accent/20 to-primary/10 aspect-video max-w-2xl mx-auto mb-12 cursor-pointer group"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      data-testid="video-placeholder"
+    >
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-around opacity-20">
+          {[...Array(3)].map((_, i) => (
+            <div 
+              key={i} 
+              className={`flex flex-col items-center gap-2 transition-all duration-1000 ${
+                isHovered ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+              }`}
+              style={{ transitionDelay: `${i * 200}ms` }}
+            >
+              <Users className="h-12 w-12 text-primary" />
+              <div className="h-2 w-16 bg-primary/30 rounded-full">
+                <div 
+                  className="h-full bg-primary rounded-full transition-all duration-1000"
+                  style={{ width: isHovered ? `${30 + (i * 25)}%` : '10%' }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="absolute top-4 right-4 flex items-center gap-2 text-primary/60">
+          <Zap className="h-4 w-4" />
+          <span className="text-sm font-medium">קנייה קבוצתית</span>
+        </div>
+        
+        <div className="z-10 flex flex-col items-center gap-4">
+          <div 
+            className={`w-20 h-20 rounded-full bg-primary/90 flex items-center justify-center transition-all duration-300 ${
+              isHovered ? 'scale-110 shadow-lg shadow-primary/30' : 'scale-100'
+            }`}
+          >
+            <Play className="h-8 w-8 text-primary-foreground mr-[-4px]" />
+          </div>
+          <p className="text-lg font-medium text-foreground/80">
+            צפו איך זה עובד
+          </p>
+          <p className="text-sm text-muted-foreground">
+            סרטון הסבר - בקרוב
+          </p>
+        </div>
+        
+        <div className={`absolute bottom-4 left-4 right-4 transition-all duration-500 ${
+          isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+        }`}>
+          <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <TrendingDown className="h-4 w-4 text-success" />
+              <span>המחיר יורד</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Users className="h-4 w-4 text-primary" />
+              <span>יותר משתתפים</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <CheckCircle className="h-4 w-4 text-success" />
+              <span>כולם מרוויחים</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent" />
+    </div>
+  );
+}
+
 export default function HowItWorks() {
   return (
     <section className="py-12 md:py-16 bg-muted/30" data-testid="how-it-works-section">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h2 className="text-2xl md:text-3xl font-bold mb-4" data-testid="how-it-works-title">
             איך זה עובד?
           </h2>
@@ -42,6 +121,8 @@ export default function HowItWorks() {
             ב-4 צעדים פשוטים תתחילו לחסוך כסף אמיתי
           </p>
         </div>
+
+        <AnimatedVideoPlaceholder />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {steps.map((step, index) => (
