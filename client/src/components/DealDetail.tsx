@@ -171,7 +171,7 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
             <div className="grid grid-cols-2 gap-4">
               <Card className="bg-muted/30">
                 <CardContent className="p-4 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">מחיר ראשוני</p>
+                  <p className="text-xs text-muted-foreground mb-1">מחיר התחלתי</p>
                   <p className="text-xl font-bold line-through text-muted-foreground">
                     ₪{originalPrice.toLocaleString()}
                   </p>

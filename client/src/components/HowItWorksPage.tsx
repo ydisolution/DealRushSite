@@ -94,7 +94,7 @@ export default function HowItWorksPage({ onGetStarted }: HowItWorksPageProps) {
               <CardContent className="p-6 h-full flex flex-col">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Clock className="h-5 w-5 text-muted-foreground" />
-                  מחיר ראשוני
+                  מחיר התחלתי
                 </h3>
                 <p className="text-muted-foreground flex-1">
                   אתם משלמים מחיר קבוע, בין אם אתם הקונה היחיד או אחד מבין אלפים. אין שום יתרון לקנייה קבוצתית.
@@ -126,7 +126,7 @@ export default function HowItWorksPage({ onGetStarted }: HowItWorksPageProps) {
               <div className="text-center mb-6">
                 <p className="text-sm text-muted-foreground mb-1">טלוויזיה Samsung 65"</p>
                 <p className="text-lg">
-                  מחיר ראשוני: <span className="font-bold">₪6,500</span>
+                  מחיר התחלתי: <span className="font-bold">₪6,500</span>
                 </p>
               </div>
               <div className="space-y-3">

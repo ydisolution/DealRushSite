@@ -80,7 +80,7 @@ const tierSchema = z.object({
   maxParticipants: z.number().min(1),
   discount: z.number().min(0).max(100),
   price: z.number().optional(),
-  commission: z.number().min(0).max(100).optional(),
+  commission: z.coerce.number().min(0).max(100).optional().default(5),
 });
 
 const dealFormSchema = z.object({
@@ -88,7 +88,6 @@ const dealFormSchema = z.object({
   description: z.string().optional(),
   category: z.string().min(1, "קטגוריה נדרשת"),
   originalPrice: z.number().min(1, "מחיר מקורי נדרש"),
-  currentPrice: z.number().min(1, "מחיר נוכחי נדרש"),
   targetParticipants: z.number().min(1, "יעד משתתפים נדרש"),
   endTime: z.string().min(1, "תאריך סיום נדרש"),
   images: z.array(z.string()).min(1, "יש להעלות לפחות תמונה אחת"),
@@ -100,7 +99,7 @@ const dealFormSchema = z.object({
   supplierName: z.string().optional(),
   supplierStripeKey: z.string().optional(),
   supplierBankAccount: z.string().optional(),
-  platformCommission: z.number().min(0).max(100).optional(),
+  platformCommission: z.coerce.number().min(0).max(100).optional().default(5),
 });
 
 type DealFormData = z.infer<typeof dealFormSchema>;
@@ -161,7 +160,6 @@ function DealForm({
       description: deal?.description || "",
       category: deal?.category || "",
       originalPrice: deal?.originalPrice || 0,
-      currentPrice: deal?.currentPrice || 0,
       targetParticipants: deal?.targetParticipants || 100,
       endTime: deal?.endTime ? new Date(deal.endTime).toISOString().slice(0, 16) : "",
       images: deal?.images || [],
@@ -253,12 +251,18 @@ function DealForm({
   };
 
   const onSubmit = (data: DealFormData) => {
+    const tiersWithPrices = data.tiers.map(tier => ({
+      ...tier,
+      price: calculateTierPrice(tier.discount),
+    }));
+    
+    const firstTier = tiersWithPrices.sort((a, b) => a.minParticipants - b.minParticipants)[0];
+    const currentPrice = firstTier?.price || data.originalPrice;
+    
     const formData = {
       ...data,
-      tiers: data.tiers.map(tier => ({
-        ...tier,
-        price: calculateTierPrice(tier.discount),
-      })),
+      currentPrice,
+      tiers: tiersWithPrices,
     };
 
     if (deal) {
@@ -373,7 +377,7 @@ function DealForm({
           <h3 className="font-semibold">מחירים</h3>
         </div>
         
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="originalPrice">מחיר מקורי (₪)</Label>
             <Input
@@ -383,17 +387,7 @@ function DealForm({
               placeholder="8500"
               data-testid="input-original-price"
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="currentPrice">מחיר נוכחי (₪)</Label>
-            <Input
-              id="currentPrice"
-              type="number"
-              {...form.register("currentPrice", { valueAsNumber: true })}
-              placeholder="6800"
-              data-testid="input-current-price"
-            />
+            <p className="text-xs text-muted-foreground">המחיר הנוכחי יחושב אוטומטית לפי מדרגות ההנחה</p>
           </div>
           
           <div className="space-y-2">

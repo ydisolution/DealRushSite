@@ -4,7 +4,7 @@ import { Clock, TrendingDown, Users, AlertTriangle, Flame } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import CircularCountdownTimer from "@/components/CircularCountdownTimer";
+import CountdownTimer from "@/components/CountdownTimer";
 import type { Deal } from "@shared/schema";
 
 export default function ClosingTodayPage() {
@@ -117,10 +117,10 @@ export default function ClosingTodayPage() {
                     
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
-                        <CircularCountdownTimer 
+                        <CountdownTimer 
                           endTime={new Date(deal.endTime)} 
                           size="sm" 
-                          showLabels={false}
+                          showLabels={true}
                         />
                       </div>
                       <div className="text-left">

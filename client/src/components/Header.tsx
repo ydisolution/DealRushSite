@@ -107,18 +107,25 @@ export default function Header({
                   <ShoppingBag className="h-5 w-5" />
                 </Button>
               </Link>
-              <Link href="/dashboard">
-                <Button variant="ghost" size="icon" data-testid="button-profile" className="p-0 rounded-full">
+              <Link href="/dashboard" className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" data-testid="button-profile" className="gap-2 px-2">
                   {user?.profileImageUrl ? (
-                    <Avatar className="h-8 w-8">
+                    <Avatar className="h-7 w-7">
                       <AvatarImage src={user.profileImageUrl} alt={user.firstName || "User"} className="object-cover" />
-                      <AvatarFallback>
+                      <AvatarFallback className="text-xs">
                         {user.firstName?.[0]}{user.lastName?.[0]}
                       </AvatarFallback>
                     </Avatar>
                   ) : (
-                    <User className="h-5 w-5" />
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback className="text-xs">
+                        {user?.firstName?.[0] || user?.email?.[0] || "U"}{user?.lastName?.[0] || ""}
+                      </AvatarFallback>
+                    </Avatar>
                   )}
+                  <span className="hidden sm:inline text-sm font-medium">
+                    {user?.firstName ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ''}` : 'המשתמש שלי'}
+                  </span>
                 </Button>
               </Link>
               <Button 

@@ -90,25 +90,25 @@ export default function CountdownTimer({
 
   const sizeClasses = {
     sm: {
-      container: "gap-1",
-      box: "min-w-[28px] h-7 text-xs font-semibold px-1",
-      label: "text-[9px]",
-      separator: "text-xs",
-      endDate: "text-[10px]",
-    },
-    md: {
       container: "gap-1.5",
       box: "min-w-[36px] h-9 text-sm font-bold px-1.5",
       label: "text-[10px]",
       separator: "text-sm",
       endDate: "text-xs",
     },
-    lg: {
+    md: {
       container: "gap-2",
-      box: "min-w-[48px] h-12 text-lg font-black px-2",
+      box: "min-w-[48px] h-12 text-lg font-bold px-2",
       label: "text-xs",
       separator: "text-lg",
       endDate: "text-sm",
+    },
+    lg: {
+      container: "gap-3",
+      box: "min-w-[60px] h-14 text-xl font-black px-3",
+      label: "text-sm",
+      separator: "text-xl",
+      endDate: "text-base",
     },
   };
 
