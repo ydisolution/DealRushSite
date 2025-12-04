@@ -125,6 +125,9 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  // Trust proxy for Replit environment (required for secure cookies)
+  app.set('trust proxy', 1);
+  
   app.use(session({
     store: new MemoryStoreSession({
       checkPeriod: 86400000,
@@ -133,8 +136,9 @@ export async function registerRoutes(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       httpOnly: true,
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   }));
