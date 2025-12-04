@@ -219,10 +219,20 @@ function DealForm({
     try {
       const response = await fetch("/api/upload", { method: "POST", body: formData });
       const data = await response.json();
-      if (data.urls) {
+      
+      if (!response.ok) {
+        const errorMessage = data.message === "File too large" 
+          ? "הקובץ גדול מדי. הגודל המקסימלי הוא 20MB"
+          : "שגיאה בהעלאת תמונות";
+        toast({ title: errorMessage, variant: "destructive" });
+        return;
+      }
+      
+      if (data.urls && data.urls.length > 0) {
         const newUrls = [...imageUrls, ...data.urls];
         setImageUrls(newUrls);
         form.setValue("images", newUrls);
+        toast({ title: `${data.urls.length} תמונות הועלו בהצלחה` });
       }
     } catch (error) {
       toast({ title: "שגיאה בהעלאת תמונות", variant: "destructive" });
