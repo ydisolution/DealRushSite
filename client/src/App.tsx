@@ -62,7 +62,7 @@ function AppContent() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   useNotifications();
-  const notificationCount = isAuthenticated ? 2 : 0;
+  const notificationCount = isAuthenticated ? 1 : 0;
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
