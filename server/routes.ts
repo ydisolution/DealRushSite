@@ -1005,6 +1005,88 @@ export async function registerRoutes(
     }
   });
 
+  // Get closed deals with comprehensive statistics
+  app.get("/api/admin/closed-deals", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const allDeals = await storage.getDeals();
+      const closedDeals = allDeals.filter(d => 
+        d.status === 'closed' || d.status === 'completed' || d.status === 'cancelled'
+      );
+      
+      const closedDealsWithStats = await Promise.all(closedDeals.map(async (deal) => {
+        const dealParticipants = await storage.getParticipantsByDeal(deal.id);
+        const chargedParticipants = dealParticipants.filter(p => 
+          p.paymentStatus === 'charged' || p.paymentStatus === 'card_validated'
+        );
+        
+        const totalRevenue = chargedParticipants.reduce((sum, p) => sum + (p.chargedAmount || p.pricePaid), 0);
+        const avgDiscount = deal.originalPrice > 0 && chargedParticipants.length > 0
+          ? Math.round((1 - (totalRevenue / chargedParticipants.length / deal.originalPrice)) * 100)
+          : 0;
+        
+        const totalOriginalValue = deal.originalPrice * chargedParticipants.length;
+        const totalSavings = totalOriginalValue - totalRevenue;
+        
+        const commissionRate = deal.platformCommission || 5;
+        const platformProfit = Math.round(totalRevenue * (commissionRate / 100));
+        
+        return {
+          id: deal.id,
+          name: deal.name,
+          category: deal.category,
+          image: deal.images[0],
+          originalPrice: deal.originalPrice,
+          finalPrice: chargedParticipants.length > 0 
+            ? Math.round(totalRevenue / chargedParticipants.length)
+            : deal.currentPrice,
+          status: deal.status,
+          closedAt: deal.closedAt,
+          endTime: deal.endTime,
+          supplierName: deal.supplierName,
+          tiers: deal.tiers,
+          
+          unitsSold: chargedParticipants.length,
+          totalParticipants: dealParticipants.length,
+          targetParticipants: deal.targetParticipants,
+          minParticipants: deal.minParticipants,
+          
+          totalRevenue,
+          totalOriginalValue,
+          totalSavings,
+          avgDiscount,
+          platformCommission: commissionRate,
+          platformProfit,
+          vendorPayout: totalRevenue - platformProfit,
+          
+          participants: dealParticipants.map(p => ({
+            id: p.id,
+            name: p.name,
+            email: p.email,
+            phone: p.phone,
+            position: p.position,
+            pricePaid: p.pricePaid,
+            chargedAmount: p.chargedAmount,
+            paymentStatus: p.paymentStatus,
+            tierAtJoin: p.tierAtJoin,
+            finalTier: p.finalTier,
+            joinedAt: p.joinedAt,
+            chargedAt: p.chargedAt,
+            cardLast4: p.cardLast4,
+            cardBrand: p.cardBrand,
+            discount: deal.originalPrice > 0 
+              ? Math.round((1 - ((p.chargedAmount || p.pricePaid) / deal.originalPrice)) * 100)
+              : 0,
+          })),
+        };
+      }));
+      
+      res.json(closedDealsWithStats);
+    } catch (error) {
+      console.error("Error fetching closed deals:", error);
+      res.status(500).json({ error: "Failed to fetch closed deals" });
+    }
+  });
+
   app.post("/api/email/test", isAdmin, async (req: Request, res: Response) => {
     try {
       const { to, subject, body } = req.body;

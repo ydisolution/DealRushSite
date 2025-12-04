@@ -39,7 +39,12 @@ import {
   UserPlus,
   ShoppingCart,
   Wallet,
-  Clock
+  Clock,
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  XCircle,
+  Eye
 } from "lucide-react";
 import type { Deal } from "@shared/schema";
 import { CATEGORIES } from "@shared/schema";
@@ -876,6 +881,376 @@ function AnalyticsDashboard() {
   );
 }
 
+interface ClosedDeal {
+  id: string;
+  name: string;
+  category: string;
+  image: string;
+  originalPrice: number;
+  finalPrice: number;
+  status: string;
+  closedAt: string | null;
+  endTime: string;
+  supplierName: string | null;
+  tiers: Array<{ minParticipants: number; maxParticipants: number; discount: number; price?: number }>;
+  unitsSold: number;
+  totalParticipants: number;
+  targetParticipants: number;
+  minParticipants: number;
+  totalRevenue: number;
+  totalOriginalValue: number;
+  totalSavings: number;
+  avgDiscount: number;
+  platformCommission: number;
+  platformProfit: number;
+  vendorPayout: number;
+  participants: Array<{
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    position: number;
+    pricePaid: number;
+    chargedAmount: number | null;
+    paymentStatus: string | null;
+    tierAtJoin: number | null;
+    finalTier: number | null;
+    joinedAt: string;
+    chargedAt: string | null;
+    cardLast4: string | null;
+    cardBrand: string | null;
+    discount: number;
+  }>;
+}
+
+function ClosedDealsDashboard() {
+  const [expandedDeal, setExpandedDeal] = useState<string | null>(null);
+  
+  const { data: closedDeals = [], isLoading } = useQuery<ClosedDeal[]>({
+    queryKey: ["/api/admin/closed-deals"],
+  });
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("he-IL", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "bg-success/10 text-success border-success/20";
+      case "closed":
+        return "bg-primary/10 text-primary border-primary/20";
+      case "cancelled":
+        return "bg-destructive/10 text-destructive border-destructive/20";
+      default:
+        return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "הושלם";
+      case "closed":
+        return "נסגר";
+      case "cancelled":
+        return "בוטל";
+      default:
+        return status;
+    }
+  };
+
+  const getInitials = (name: string) => {
+    const parts = name.split(" ");
+    if (parts.length >= 2) {
+      return `${parts[0][0]}.${parts[1][0]}.`;
+    }
+    return name.substring(0, 2);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          {[1, 2, 3].map(i => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-4">
+                <div className="h-4 bg-muted rounded w-1/2 mb-2" />
+                <div className="h-8 bg-muted rounded w-1/3" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const totalStats = closedDeals.reduce((acc, deal) => ({
+    unitsSold: acc.unitsSold + deal.unitsSold,
+    totalRevenue: acc.totalRevenue + deal.totalRevenue,
+    totalSavings: acc.totalSavings + deal.totalSavings,
+    platformProfit: acc.platformProfit + deal.platformProfit,
+  }), { unitsSold: 0, totalRevenue: 0, totalSavings: 0, platformProfit: 0 });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">דילים סגורים</h2>
+        <Badge variant="outline" className="text-base">
+          {closedDeals.length} דילים
+        </Badge>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card data-testid="closed-stat-units">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-primary/10">
+                <ShoppingCart className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">יחידות שנמכרו</p>
+                <p className="text-2xl font-bold">{totalStats.unitsSold}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="closed-stat-revenue">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-success/10">
+                <DollarSign className="h-6 w-6 text-success" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">הכנסות</p>
+                <p className="text-2xl font-bold">₪{totalStats.totalRevenue.toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="closed-stat-savings">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-accent/30">
+                <Percent className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">חיסכון ללקוחות</p>
+                <p className="text-2xl font-bold text-success">₪{totalStats.totalSavings.toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="closed-stat-profit">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-success/10">
+                <Wallet className="h-6 w-6 text-success" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">רווח פלטפורמה</p>
+                <p className="text-2xl font-bold text-success">₪{totalStats.platformProfit.toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {closedDeals.length === 0 ? (
+        <Card className="p-12 text-center" data-testid="closed-deals-empty-state">
+          <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">אין דילים סגורים</h3>
+          <p className="text-muted-foreground">כשדילים יסתיימו, הם יופיעו כאן עם סטטיסטיקות מפורטות</p>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {closedDeals.map((deal) => (
+            <Card key={deal.id} className="overflow-hidden" data-testid={`card-closed-deal-${deal.id}`}>
+              <CardContent className="p-0">
+                <div 
+                  className="p-4 cursor-pointer hover-elevate"
+                  onClick={() => setExpandedDeal(expandedDeal === deal.id ? null : deal.id)}
+                  data-testid={`button-expand-deal-${deal.id}`}
+                >
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-shrink-0">
+                      {deal.image ? (
+                        <img 
+                          src={deal.image} 
+                          alt={deal.name}
+                          className="w-full md:w-24 h-24 object-cover rounded-md bg-muted"
+                        />
+                      ) : (
+                        <div className="w-full md:w-24 h-24 bg-muted rounded-md flex items-center justify-center">
+                          <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-lg">{deal.name}</h3>
+                            <Badge className={getStatusColor(deal.status)}>
+                              {deal.status === "cancelled" ? (
+                                <XCircle className="h-3 w-3 ml-1" />
+                              ) : (
+                                <CheckCircle className="h-3 w-3 ml-1" />
+                              )}
+                              {getStatusLabel(deal.status)}
+                            </Badge>
+                          </div>
+                          {deal.supplierName && (
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <Building className="h-3.5 w-3.5" />
+                              {deal.supplierName}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm text-muted-foreground">
+                            נסגר: {formatDate(deal.closedAt || deal.endTime)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">מחיר התחלתי</p>
+                          <p className="font-semibold">₪{deal.originalPrice.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">מחיר סופי</p>
+                          <p className="font-semibold text-success">₪{deal.finalPrice.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">יחידות נמכרו</p>
+                          <p className="font-semibold">{deal.unitsSold}/{deal.targetParticipants}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">הנחה ממוצעת</p>
+                          <p className="font-semibold text-success">{deal.avgDiscount}%</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">הכנסות</p>
+                          <p className="font-semibold">₪{deal.totalRevenue.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center">
+                      {expandedDeal === deal.id ? (
+                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {expandedDeal === deal.id && (
+                  <div className="border-t p-4 bg-muted/30">
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <h4 className="font-semibold flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4" />
+                          סיכום פיננסי
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">שווי מקורי כולל:</span>
+                            <span>₪{deal.totalOriginalValue.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">הכנסות בפועל:</span>
+                            <span>₪{deal.totalRevenue.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-success">
+                            <span>חיסכון ללקוחות:</span>
+                            <span>₪{deal.totalSavings.toLocaleString()}</span>
+                          </div>
+                          <Separator />
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">עמלת פלטפורמה ({deal.platformCommission}%):</span>
+                            <span className="text-success">₪{deal.platformProfit.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between font-semibold">
+                            <span>תשלום לספק:</span>
+                            <span>₪{deal.vendorPayout.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h4 className="font-semibold flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          רשימת לקוחות ({deal.participants.length})
+                        </h4>
+                        <div className="max-h-64 overflow-y-auto space-y-2">
+                          {deal.participants.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">אין משתתפים</p>
+                          ) : (
+                            deal.participants.map((participant, index) => (
+                              <div 
+                                key={participant.id} 
+                                className="flex items-center justify-between p-2 bg-background rounded-md text-sm"
+                                data-testid={`row-participant-${participant.id}`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <span className="text-muted-foreground w-6">#{participant.position}</span>
+                                  <span className="font-medium">{getInitials(participant.name)}</span>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={
+                                      participant.paymentStatus === "charged" 
+                                        ? "bg-success/10 text-success" 
+                                        : participant.paymentStatus === "card_validated"
+                                        ? "bg-primary/10 text-primary"
+                                        : "bg-muted"
+                                    }
+                                  >
+                                    {participant.paymentStatus === "charged" ? "שולם" :
+                                     participant.paymentStatus === "card_validated" ? "מאומת" :
+                                     participant.paymentStatus === "cancelled" ? "בוטל" :
+                                     participant.paymentStatus || "ממתין"}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <span className="text-muted-foreground">
+                                    {participant.discount}% הנחה
+                                  </span>
+                                  <span className="font-semibold">
+                                    ₪{(participant.chargedAmount || participant.pricePaid).toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminContentPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -927,10 +1302,14 @@ function AdminContentPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-xl grid-cols-3">
           <TabsTrigger value="deals" className="gap-2" data-testid="tab-deals">
             <Package className="h-4 w-4" />
             ניהול דילים
+          </TabsTrigger>
+          <TabsTrigger value="closed" className="gap-2" data-testid="tab-closed">
+            <CheckCircle className="h-4 w-4" />
+            דילים סגורים
           </TabsTrigger>
           <TabsTrigger value="analytics" className="gap-2" data-testid="tab-analytics">
             <BarChart3 className="h-4 w-4" />
@@ -1144,6 +1523,10 @@ function AdminContentPage() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="closed">
+          <ClosedDealsDashboard />
         </TabsContent>
 
         <TabsContent value="analytics">

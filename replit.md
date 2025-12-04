@@ -47,6 +47,17 @@ Preferred communication style: Simple, everyday language.
   - Date range filters (today, 7 days, 30 days)
 - Added animated video placeholder in "How it Works" section
 - Modern minimalist countdown timer design (removed aggressive FOMO messaging)
+- Fixed Israel timezone handling using Intl.DateTimeFormat with Asia/Jerusalem (DST-aware)
+- Added Closed Deals Dashboard in Admin Panel:
+  - API: GET `/api/admin/closed-deals` returns comprehensive stats per deal
+  - Stats: units sold, total revenue, customer savings, platform profit
+  - Expandable deal cards with financial breakdown
+  - Participant list showing initials (privacy), position, discount, payment status
+  - Status display: completed, closed, cancelled with appropriate styling
+- Updated Stripe payment flow:
+  - Uses Stripe Elements (CardElement) for card collection
+  - SetupIntent flow with proper error handling and retry
+  - Guards against missing clientSecret with error UI
 
 ## System Architecture
 
@@ -93,6 +104,7 @@ Preferred communication style: Simple, everyday language.
 - POST `/api/upload` - Upload images (multer middleware)
 - GET `/api/admin/analytics` - Get analytics data with date range filter (admin only)
 - GET `/api/admin/participants` - Get all participants with deal names (admin only)
+- GET `/api/admin/closed-deals` - Get closed deals with comprehensive stats (admin only)
 - GET `/api/social/login` - Initiate OAuth social login via Replit OIDC
 - GET `/api/callback` - OAuth callback handler
 
