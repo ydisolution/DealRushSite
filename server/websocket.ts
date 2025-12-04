@@ -22,6 +22,8 @@ interface DealClosedMessage {
   dealId: string;
   dealName: string;
   finalPrice: number;
+  totalUnitsSold?: number;
+  discountPercent?: number;
   participantCount: number;
 }
 

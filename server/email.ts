@@ -232,11 +232,22 @@ export async function sendDealClosedNotification(
   toEmail: string,
   dealName: string,
   finalPrice: number,
-  originalPrice: number
+  originalPrice: number,
+  position: number = 0,
+  discountPercent: number = 0,
+  quantity: number = 1
 ): Promise<boolean> {
   const savings = originalPrice - finalPrice;
-  const discountPercent = Math.round((savings / originalPrice) * 100);
-  const subject = `הדיל נסגר! ${dealName}`;
+  const calculatedDiscount = discountPercent || Math.round((savings / originalPrice) * 100);
+  const subject = `🎉 מזל טוב! הדיל נסגר בהצלחה: ${dealName}`;
+  
+  const quantityInfo = quantity > 1 
+    ? `<p style="text-align: right;"><strong>כמות:</strong> ${quantity} יחידות</p>`
+    : '';
+  
+  const positionInfo = position > 0 
+    ? `<p style="text-align: right;"><strong>המיקום שלך בדיל:</strong> #${position}</p>`
+    : '';
   
   const htmlBody = `
     <!DOCTYPE html>
@@ -244,30 +255,43 @@ export async function sendDealClosedNotification(
     <head>
       <meta charset="UTF-8">
       <style>
-        body { font-family: 'Rubik', 'Heebo', Arial, sans-serif; direction: rtl; }
+        body { font-family: 'Rubik', 'Heebo', Arial, sans-serif; direction: rtl; text-align: right; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
-        .price { font-size: 36px; color: #667eea; font-weight: bold; }
+        .header { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; padding: 30px; text-align: right; border-radius: 10px 10px 0 0; }
+        .header h1 { text-align: center; margin: 0 0 10px 0; }
+        .header p { text-align: center; margin: 0; }
+        .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; text-align: right; }
+        .content h2 { text-align: right; color: #333; }
+        .content p { text-align: right; }
+        .price { font-size: 36px; color: #22c55e; font-weight: bold; text-align: center; }
+        .original-price { font-size: 18px; color: #999; text-decoration: line-through; text-align: center; }
         .savings { background: #dcfce7; color: #16a34a; padding: 10px 20px; border-radius: 20px; display: inline-block; font-weight: bold; margin: 10px 0; }
-        .info-box { background: white; padding: 15px; border-radius: 8px; margin: 15px 0; text-align: center; }
+        .info-box { background: white; padding: 20px; border-radius: 8px; margin: 15px 0; text-align: right; }
+        .celebration { font-size: 48px; text-align: center; margin-bottom: 10px; }
         .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="header">
+          <div class="celebration">🎉</div>
           <h1>DealRush</h1>
-          <p>הדיל נסגר בהצלחה!</p>
+          <p>מזל טוב! הדיל נסגר בהצלחה!</p>
         </div>
         <div class="content">
           <h2>${dealName}</h2>
           <div class="info-box">
-            <p><strong>המחיר הסופי שלך:</strong></p>
+            <p style="text-align: right;"><strong>המחיר הסופי שלך:</strong></p>
+            <p class="original-price">₪${originalPrice.toLocaleString()}</p>
             <p class="price">₪${finalPrice.toLocaleString()}</p>
-            <p class="savings">חסכת ${discountPercent}% - ₪${savings.toLocaleString()}!</p>
+            <p style="text-align: center;"><span class="savings">חסכת ${calculatedDiscount}% - ₪${savings.toLocaleString()}!</span></p>
+          </div>
+          <div class="info-box">
+            ${positionInfo}
+            ${quantityInfo}
           </div>
           <p>נציג יצור איתך קשר בקרוב לסיום הרכישה ותיאום המשלוח.</p>
+          <p>תודה שהשתתפת בקנייה הקבוצתית וחסכת כסף יחד עם שאר המשתתפים!</p>
         </div>
         <div class="footer">
           <p>תודה שבחרת ב-DealRush</p>
@@ -298,12 +322,16 @@ export async function sendDealCancelledNotification(
     <head>
       <meta charset="UTF-8">
       <style>
-        body { font-family: 'Rubik', 'Heebo', Arial, sans-serif; direction: rtl; }
+        body { font-family: 'Rubik', 'Heebo', Arial, sans-serif; direction: rtl; text-align: right; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
-        .info-box { background: white; padding: 15px; border-radius: 8px; margin: 15px 0; text-align: center; }
-        .notice { background: #fef2f2; color: #dc2626; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; text-align: right; border-radius: 10px 10px 0 0; }
+        .header h1 { text-align: center; margin: 0 0 10px 0; }
+        .header p { text-align: center; margin: 0; }
+        .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; text-align: right; }
+        .content h2 { text-align: right; color: #333; }
+        .content p { text-align: right; }
+        .info-box { background: white; padding: 20px; border-radius: 8px; margin: 15px 0; text-align: right; }
+        .notice { background: #fef2f2; color: #dc2626; padding: 15px; border-radius: 8px; margin: 15px 0; text-align: right; }
         .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
       </style>
     </head>
@@ -350,7 +378,7 @@ export async function sendTierUnlockedNotification(
   discountPercent: number
 ): Promise<boolean> {
   const savings = oldPrice - newPrice;
-  const subject = `שלב חדש נפתח! ${dealName}`;
+  const subject = `🎯 שלב הנחה חדש נפתח! ${dealName}`;
   
   const htmlBody = `
     <!DOCTYPE html>
@@ -358,21 +386,27 @@ export async function sendTierUnlockedNotification(
     <head>
       <meta charset="UTF-8">
       <style>
-        body { font-family: 'Rubik', 'Heebo', Arial, sans-serif; direction: rtl; }
+        body { font-family: 'Rubik', 'Heebo', Arial, sans-serif; direction: rtl; text-align: right; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
+        .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: right; border-radius: 10px 10px 0 0; }
+        .header h1 { text-align: center; margin: 0 0 10px 0; }
+        .header p { text-align: center; margin: 0; }
+        .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; text-align: right; }
+        .content h2 { text-align: right; color: #333; }
+        .content p { text-align: right; }
         .tier-badge { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 10px 25px; border-radius: 25px; display: inline-block; font-weight: bold; font-size: 18px; margin: 10px 0; }
-        .price-old { font-size: 18px; color: #999; text-decoration: line-through; }
-        .price-new { font-size: 36px; color: #d97706; font-weight: bold; }
+        .price-old { font-size: 18px; color: #999; text-decoration: line-through; text-align: center; }
+        .price-new { font-size: 36px; color: #d97706; font-weight: bold; text-align: center; }
         .savings { background: #fef3c7; color: #d97706; padding: 10px 20px; border-radius: 20px; display: inline-block; font-weight: bold; margin: 10px 0; }
         .info-box { background: white; padding: 20px; border-radius: 8px; margin: 15px 0; text-align: center; }
+        .celebration { font-size: 48px; text-align: center; margin-bottom: 10px; }
         .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="header">
+          <div class="celebration">🎯</div>
           <h1>DealRush</h1>
           <p>שלב הנחה חדש נפתח!</p>
         </div>
@@ -382,9 +416,9 @@ export async function sendTierUnlockedNotification(
             <p class="tier-badge">שלב ${tierNumber}</p>
             <p class="price-old">₪${oldPrice.toLocaleString()}</p>
             <p class="price-new">₪${newPrice.toLocaleString()}</p>
-            <p class="savings">${discountPercent}% הנחה - חוסכים ₪${savings.toLocaleString()}!</p>
+            <p><span class="savings">${discountPercent}% הנחה - חוסכים ₪${savings.toLocaleString()}!</span></p>
           </div>
-          <p>ככל שיותר אנשים מצטרפים, ההנחה גדלה! שתף את הדיל עם חברים כדי לחסוך עוד יותר.</p>
+          <p>ככל שיותר יחידות נמכרות, ההנחה גדלה! שתף את הדיל עם חברים כדי לחסוך עוד יותר.</p>
         </div>
         <div class="footer">
           <p>תודה שבחרת ב-DealRush</p>

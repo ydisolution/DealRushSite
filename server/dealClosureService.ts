@@ -108,19 +108,25 @@ class DealClosureService {
     
       const participants = await storage.getParticipantsByDeal(deal.id);
       const validParticipants = participants.filter(p => 
-        p.paymentStatus === 'card_validated' && p.stripePaymentMethodId
+        (p.paymentStatus === 'card_validated' && p.stripePaymentMethodId) ||
+        p.paymentStatus === 'pending_payment'
       );
       
-      const minParticipants = deal.minParticipants || 1;
+      const totalUnitsSold = participants.reduce((sum, p) => sum + (p.quantity || 1), 0);
+      const validUnitsSold = validParticipants.reduce((sum, p) => sum + (p.quantity || 1), 0);
       
-      if (validParticipants.length < minParticipants) {
+      console.log(`Deal ${deal.id}: Total participants: ${participants.length}, Valid: ${validParticipants.length}, Total units: ${totalUnitsSold}, Valid units: ${validUnitsSold}`);
+      
+      const minUnits = deal.minParticipants || 1;
+      
+      if (validUnitsSold < minUnits) {
         await this.cancelDeal(deal, participants, 
-          `הדיל לא הגיע למספר המשתתפים המינימלי (${minParticipants}). השתתפו ${validParticipants.length} אנשים בלבד.`
+          `הדיל לא הגיע לכמות היחידות המינימלית (${minUnits}). נמכרו ${validUnitsSold} יחידות בלבד.`
         );
         return;
       }
 
-      await this.chargeParticipants(deal, validParticipants);
+      await this.chargeParticipants(deal, validParticipants, totalUnitsSold);
     } catch (error) {
       console.error(`Error closing deal ${deal.id}:`, error);
       await storage.updateDeal(deal.id, { status: 'active' });
@@ -161,45 +167,71 @@ class DealClosureService {
     console.log(`Deal ${deal.id} cancelled, notified ${participants.length} participants`);
   }
 
-  private async chargeParticipants(deal: Deal, participants: Participant[]) {
-    const currentTierIndex = deal.tiers.findIndex(t => 
-      deal.participants >= t.minParticipants && deal.participants <= t.maxParticipants
-    );
+  private async chargeParticipants(deal: Deal, participants: Participant[], totalUnitsSold: number) {
+    const sortedTiers = [...deal.tiers].sort((a, b) => a.minParticipants - b.minParticipants);
     
-    const currentTier = currentTierIndex >= 0 ? deal.tiers[currentTierIndex] : deal.tiers[0];
-    const finalPrice = currentTier?.price || 
+    let currentTier = sortedTiers[0];
+    let currentTierIndex = 0;
+    for (let i = sortedTiers.length - 1; i >= 0; i--) {
+      if (totalUnitsSold >= sortedTiers[i].minParticipants) {
+        currentTier = sortedTiers[i];
+        currentTierIndex = i;
+        break;
+      }
+    }
+    
+    const finalBasePrice = currentTier?.price || 
       Math.round(deal.originalPrice * (1 - (currentTier?.discount || 0) / 100));
+    
+    const discountPercent = currentTier?.discount || 0;
 
-    console.log(`Charging ${participants.length} participants at final price: ₪${finalPrice}`);
+    console.log(`Deal ${deal.id}: Total units sold: ${totalUnitsSold}, Tier: ${currentTierIndex + 1}, Base price: ₪${finalBasePrice}, Discount: ${discountPercent}%`);
 
     const results: ChargeResult[] = [];
+    const participantPrices: Map<string, number> = new Map();
 
     for (const participant of participants) {
       try {
+        const quantity = participant.quantity || 1;
+        const unitPrice = finalBasePrice;
+        const totalPrice = unitPrice * quantity;
+        
+        participantPrices.set(participant.id, totalPrice);
+        
         const user = participant.userId ? await storage.getUser(participant.userId) : null;
         const customerId = user?.stripeCustomerId;
         
         if (!customerId || !participant.stripePaymentMethodId) {
-          results.push({
-            participantId: participant.id,
-            success: false,
-            error: 'Missing Stripe customer or payment method',
-          });
+          if (participant.paymentStatus === 'pending_payment') {
+            results.push({
+              participantId: participant.id,
+              success: true,
+            });
+            await storage.updateParticipant(participant.id, {
+              pricePaid: totalPrice,
+            });
+          } else {
+            results.push({
+              participantId: participant.id,
+              success: false,
+              error: 'Missing Stripe customer or payment method',
+            });
+          }
           continue;
         }
 
         const paymentIntent = await stripeService.chargePaymentMethod(
           customerId,
           participant.stripePaymentMethodId,
-          finalPrice,
+          totalPrice,
           'ils',
-          { dealId: deal.id, dealName: deal.name }
+          { dealId: deal.id, dealName: deal.name, quantity: String(quantity) }
         );
 
         await storage.updateParticipant(participant.id, {
           paymentStatus: 'charged',
           stripePaymentIntentId: paymentIntent.id,
-          pricePaid: finalPrice,
+          pricePaid: totalPrice,
         });
 
         results.push({
@@ -213,8 +245,8 @@ class DealClosureService {
           sendPaymentChargedNotification(
             email,
             deal.name,
-            finalPrice,
-            paymentIntent.id
+            totalPrice,
+            participant.cardLast4 || paymentIntent.id
           ).catch(err => {
             console.error(`Failed to send payment notification to ${email}:`, err);
           });
@@ -254,12 +286,16 @@ class DealClosureService {
       const result = results.find(r => r.participantId === participant.id);
       if (result?.success) {
         const email = participant.email;
+        const participantPrice = participantPrices.get(participant.id) || finalBasePrice;
         if (email) {
           sendDealClosedNotification(
             email,
             deal.name,
-            finalPrice,
-            deal.originalPrice
+            participantPrice,
+            deal.originalPrice * (participant.quantity || 1),
+            participant.position || 0,
+            discountPercent,
+            participant.quantity || 1
           ).catch(err => {
             console.error(`Failed to send deal closed notification to ${email}:`, err);
           });
@@ -277,7 +313,9 @@ class DealClosureService {
       type: 'deal_closed',
       dealId: deal.id,
       dealName: deal.name,
-      finalPrice,
+      finalPrice: finalBasePrice,
+      totalUnitsSold,
+      discountPercent,
       participantCount: successCount,
     });
 
