@@ -325,11 +325,28 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
   };
 
   useEffect(() => {
-    fetch("/api/stripe/publishable-key")
-      .then(res => res.json())
+    fetch("/api/stripe/publishable-key", {
+      credentials: "include",
+    })
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then(data => {
+        console.log("Stripe key response:", data);
         if (data.publishableKey) {
-          setStripePromise(loadStripe(data.publishableKey));
+          const stripePromiseResult = loadStripe(data.publishableKey);
+          console.log("loadStripe called, setting stripePromise");
+          setStripePromise(stripePromiseResult);
+        } else {
+          console.error("No publishableKey in response:", data);
+          toast({
+            title: "שגיאה",
+            description: "מפתח Stripe חסר בתגובה",
+            variant: "destructive",
+          });
         }
       })
       .catch(err => {
