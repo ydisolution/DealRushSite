@@ -18,6 +18,47 @@ import { dealClosureService } from "./dealClosureService";
 import { setupSocialAuth, createAdminUser } from "./socialAuth";
 import { db } from "./db";
 
+function parseIsraelTimeToUTC(dateTimeLocalString: string): Date {
+  const [datePart, timePart] = dateTimeLocalString.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes] = timePart.split(':').map(Number);
+  
+  const tempDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0));
+  
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  
+  const parts = formatter.formatToParts(tempDate);
+  const getPart = (type: string) => Number(parts.find(p => p.type === type)?.value || 0);
+  
+  const israelHour = getPart('hour');
+  const israelMinute = getPart('minute');
+  const israelDay = getPart('day');
+  const israelMonth = getPart('month');
+  const israelYear = getPart('year');
+  
+  const utcMinutes = tempDate.getUTCHours() * 60 + tempDate.getUTCMinutes();
+  const israelMinutes = israelHour * 60 + israelMinute;
+  
+  let offsetMinutes = israelMinutes - utcMinutes;
+  if (israelDay !== tempDate.getUTCDate() || israelMonth !== tempDate.getUTCMonth() + 1 || israelYear !== tempDate.getUTCFullYear()) {
+    if (israelMinutes < utcMinutes) {
+      offsetMinutes += 24 * 60;
+    } else {
+      offsetMinutes -= 24 * 60;
+    }
+  }
+  
+  return new Date(Date.UTC(year, month - 1, day, hours, minutes, 0) - offsetMinutes * 60 * 1000);
+}
+
 const MemoryStoreSession = MemoryStore(session);
 
 declare module "express-session" {
@@ -567,7 +608,7 @@ export async function registerRoutes(
         participants: Number(req.body.participants || 0),
         targetParticipants: Number(req.body.targetParticipants),
         minParticipants: Number(req.body.minParticipants || 1),
-        endTime: new Date(req.body.endTime),
+        endTime: parseIsraelTimeToUTC(req.body.endTime),
         tiers: req.body.tiers.map((t: any) => ({
           minParticipants: Number(t.minParticipants),
           maxParticipants: Number(t.maxParticipants),
@@ -598,7 +639,7 @@ export async function registerRoutes(
       if (body.participants) body.participants = Number(body.participants);
       if (body.targetParticipants) body.targetParticipants = Number(body.targetParticipants);
       if (body.minParticipants) body.minParticipants = Number(body.minParticipants);
-      if (body.endTime) body.endTime = new Date(body.endTime);
+      if (body.endTime) body.endTime = parseIsraelTimeToUTC(body.endTime);
       if (body.tiers) {
         body.tiers = body.tiers.map((t: any) => ({
           minParticipants: Number(t.minParticipants),

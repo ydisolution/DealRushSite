@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -19,7 +20,8 @@ import {
   TrendingDown,
   Building,
   Shield,
-  Flame
+  Flame,
+  Loader2
 } from "lucide-react";
 
 interface CheckoutProps {
@@ -49,13 +51,250 @@ interface CheckoutProps {
 
 type Step = "shipping" | "payment" | "confirmation";
 
-export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
-  const [step, setStep] = useState<Step>("shipping");
-  const [paymentMethod, setPaymentMethod] = useState("credit");
-  const [saveDetails, setSaveDetails] = useState(false);
-  const [orderId, setOrderId] = useState<string | null>(null);
+const cardElementOptions = {
+  style: {
+    base: {
+      fontSize: "16px",
+      color: "#1a1a1a",
+      fontFamily: '"Rubik", "Heebo", sans-serif',
+      "::placeholder": {
+        color: "#9ca3af",
+      },
+    },
+    invalid: {
+      color: "#ef4444",
+      iconColor: "#ef4444",
+    },
+  },
+  hidePostalCode: true,
+};
+
+function PaymentForm({ 
+  deal, 
+  shippingInfo, 
+  onSuccess, 
+  onBack 
+}: { 
+  deal: CheckoutProps['deal']; 
+  shippingInfo: any; 
+  onSuccess: (orderId: string, position: number) => void;
+  onBack: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
+
+  const { data: setupData, isLoading: isLoadingSetup, error: setupError, refetch: refetchSetup } = useQuery({
+    queryKey: ["/api/stripe/create-setup-intent"],
+    queryFn: async () => {
+      const res = await fetch("/api/stripe/create-setup-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to create setup intent");
+      }
+      return res.json();
+    },
+    retry: 2,
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!stripe || !elements) {
+      toast({
+        title: "שגיאה",
+        description: "מערכת התשלום לא נטענה, נסה לרענן את הדף",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
+      toast({
+        title: "שגיאה",
+        description: "לא נמצא שדה כרטיס אשראי",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    setCardError(null);
+
+    try {
+      const { error: confirmError, setupIntent } = await stripe.confirmCardSetup(
+        setupData.clientSecret,
+        {
+          payment_method: {
+            card: cardElement,
+            billing_details: {
+              name: shippingInfo.fullName,
+              phone: shippingInfo.phone,
+              address: {
+                city: shippingInfo.city,
+                line1: shippingInfo.address,
+                postal_code: shippingInfo.zipCode,
+                country: "IL",
+              },
+            },
+          },
+        }
+      );
+
+      if (confirmError) {
+        setCardError(confirmError.message || "שגיאה באימות הכרטיס");
+        setIsProcessing(false);
+        return;
+      }
+
+      if (setupIntent?.payment_method) {
+        const joinRes = await apiRequest("POST", `/api/deals/${deal.id}/join`, {
+          name: shippingInfo.fullName,
+          userId: user?.id,
+          email: user?.email,
+          phone: shippingInfo.phone,
+          paymentMethodId: setupIntent.payment_method,
+        });
+
+        const joinData = await joinRes.json();
+
+        if (!joinRes.ok) {
+          throw new Error(joinData.error || "שגיאה בהצטרפות לדיל");
+        }
+
+        queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/deals", deal.id] });
+        
+        const orderId = `DR-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+        onSuccess(orderId, joinData.participant?.position || 1);
+      }
+    } catch (error: any) {
+      toast({
+        title: "שגיאה בהצטרפות לדיל",
+        description: error.message || "אנא נסה שוב מאוחר יותר",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (isLoadingSetup) {
+    return (
+      <Card>
+        <CardContent className="p-8 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="mr-3">טוען מערכת תשלום...</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (setupError || !setupData?.clientSecret) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center space-y-4">
+          <div className="w-12 h-12 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
+            <CreditCard className="h-6 w-6 text-destructive" />
+          </div>
+          <h3 className="font-semibold">שגיאה בטעינת מערכת התשלום</h3>
+          <p className="text-sm text-muted-foreground">
+            לא הצלחנו להתחבר למערכת התשלום. נסה שוב.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Button variant="outline" onClick={onBack}>
+              חזרה
+            </Button>
+            <Button onClick={() => refetchSetup()}>
+              נסה שוב
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CreditCard className="h-5 w-5 text-primary" />
+          פרטי כרטיס אשראי
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="p-4 border rounded-md bg-background">
+            <Label className="mb-2 block">פרטי כרטיס</Label>
+            <CardElement 
+              options={cardElementOptions} 
+              onChange={(e) => {
+                if (e.error) {
+                  setCardError(e.error.message);
+                } else {
+                  setCardError(null);
+                }
+              }}
+            />
+            {cardError && (
+              <p className="text-destructive text-sm mt-2">{cardError}</p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+            <Lock className="h-4 w-4" />
+            <span>התשלום מאובטח ומוצפן. הכרטיס יחויב רק לאחר סגירת הדיל.</span>
+          </div>
+
+          <div className="flex gap-2">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onBack}
+              disabled={isProcessing}
+            >
+              חזרה
+            </Button>
+            <Button 
+              type="submit" 
+              className="flex-1 gap-2"
+              disabled={isProcessing || !stripe}
+              data-testid="button-complete-order"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  מעבד...
+                </>
+              ) : (
+                <>
+                  <Lock className="h-4 w-4" />
+                  הצטרף לדיל
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
+  const [step, setStep] = useState<Step>("shipping");
+  const [saveDetails, setSaveDetails] = useState(false);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [position, setPosition] = useState<number | null>(null);
+  const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
+  const { toast } = useToast();
   
   const [shippingInfo, setShippingInfo] = useState({
     fullName: "",
@@ -65,34 +304,23 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
     zipCode: "",
   });
 
-  const joinDealMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", `/api/deals/${deal.id}/join`, {
-        name: shippingInfo.fullName,
-        userId: user?.id,
-        email: user?.email,
+  useEffect(() => {
+    fetch("/api/stripe/publishable-key")
+      .then(res => res.json())
+      .then(data => {
+        if (data.publishableKey) {
+          setStripePromise(loadStripe(data.publishableKey));
+        }
+      })
+      .catch(err => {
+        console.error("Failed to load Stripe:", err);
+        toast({
+          title: "שגיאה",
+          description: "לא ניתן לטעון את מערכת התשלום",
+          variant: "destructive",
+        });
       });
-    },
-    onSuccess: async (response) => {
-      const data = await response.json();
-      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/deals", deal.id] });
-      const newOrderId = `DR-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-      setOrderId(newOrderId);
-      setStep("confirmation");
-      toast({
-        title: "ההזמנה אושרה!",
-        description: `הצטרפת לדיל בהצלחה. המיקום שלך: ${data.participant?.position}`,
-      });
-    },
-    onError: () => {
-      toast({
-        title: "שגיאה בהצטרפות לדיל",
-        description: "אנא נסה שוב מאוחר יותר",
-        variant: "destructive",
-      });
-    },
-  });
+  }, []);
 
   const savings = deal.originalPrice - deal.currentPrice;
   const discount = Math.round((savings / deal.originalPrice) * 100);
@@ -102,12 +330,15 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
     setStep("payment");
   };
 
-  const handlePaymentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    joinDealMutation.mutate();
+  const handlePaymentSuccess = (newOrderId: string, newPosition: number) => {
+    setOrderId(newOrderId);
+    setPosition(newPosition);
+    setStep("confirmation");
+    toast({
+      title: "הצטרפת לדיל בהצלחה!",
+      description: `המיקום שלך: ${newPosition}`,
+    });
   };
-
-  const isProcessing = joinDealMutation.isPending;
 
   const steps = [
     { id: "shipping", label: "פרטי משלוח" },
@@ -245,90 +476,22 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
               </Card>
             )}
 
-            {step === "payment" && (
+            {step === "payment" && stripePromise && (
+              <Elements stripe={stripePromise}>
+                <PaymentForm 
+                  deal={deal}
+                  shippingInfo={shippingInfo}
+                  onSuccess={handlePaymentSuccess}
+                  onBack={() => setStep("shipping")}
+                />
+              </Elements>
+            )}
+
+            {step === "payment" && !stripePromise && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CreditCard className="h-5 w-5 text-primary" />
-                    אמצעי תשלום
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handlePaymentSubmit} className="space-y-6">
-                    <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <div className="space-y-3">
-                        <div className={`flex items-center gap-3 p-4 rounded-md border cursor-pointer ${
-                          paymentMethod === "credit" ? "border-primary bg-accent/50" : ""
-                        }`}>
-                          <RadioGroupItem value="credit" id="credit" />
-                          <Label htmlFor="credit" className="flex-1 cursor-pointer">
-                            כרטיס אשראי
-                          </Label>
-                          <CreditCard className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div className={`flex items-center gap-3 p-4 rounded-md border cursor-pointer ${
-                          paymentMethod === "paypal" ? "border-primary bg-accent/50" : ""
-                        }`}>
-                          <RadioGroupItem value="paypal" id="paypal" />
-                          <Label htmlFor="paypal" className="flex-1 cursor-pointer">
-                            PayPal
-                          </Label>
-                        </div>
-                        <div className={`flex items-center gap-3 p-4 rounded-md border cursor-pointer ${
-                          paymentMethod === "installments" ? "border-primary bg-accent/50" : ""
-                        }`}>
-                          <RadioGroupItem value="installments" id="installments" />
-                          <Label htmlFor="installments" className="flex-1 cursor-pointer">
-                            תשלומים (3-12 ללא ריבית)
-                          </Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-
-                    {paymentMethod === "credit" && (
-                      <div className="space-y-4 pt-4 border-t">
-                        <div className="space-y-2">
-                          <Label htmlFor="cardNumber">מספר כרטיס</Label>
-                          <Input id="cardNumber" placeholder="0000 0000 0000 0000" data-testid="input-card" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="expiry">תוקף</Label>
-                            <Input id="expiry" placeholder="MM/YY" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="cvv">CVV</Label>
-                            <Input id="cvv" placeholder="123" />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={() => setStep("shipping")}
-                      >
-                        חזרה
-                      </Button>
-                      <Button 
-                        type="submit" 
-                        className="flex-1 gap-2"
-                        disabled={isProcessing}
-                        data-testid="button-complete-order"
-                      >
-                        {isProcessing ? (
-                          "מעבד..."
-                        ) : (
-                          <>
-                            <Lock className="h-4 w-4" />
-                            השלם הזמנה
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </form>
+                <CardContent className="p-8 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <span className="mr-3">טוען מערכת תשלום...</span>
                 </CardContent>
               </Card>
             )}
@@ -340,10 +503,15 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
                     <CheckCircle className="h-8 w-8 text-success" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold mb-2">ההזמנה אושרה!</h2>
+                    <h2 className="text-2xl font-bold mb-2">הצטרפת לדיל בהצלחה!</h2>
                     <p className="text-muted-foreground">
                       מספר הזמנה: <span className="font-mono font-medium">{orderId}</span>
                     </p>
+                    {position && (
+                      <p className="text-primary font-medium mt-2">
+                        המיקום שלך בדיל: {position}
+                      </p>
+                    )}
                   </div>
                   <Card className="bg-muted/50">
                     <CardContent className="p-4 text-right">
@@ -363,6 +531,10 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
                         </li>
                         <li className="flex items-start gap-2">
                           <CheckCircle className="h-4 w-4 text-success shrink-0 mt-0.5" />
+                          הכרטיס יחויב רק לאחר סגירת הדיל
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-success shrink-0 mt-0.5" />
                           המוצר יישלח תוך 3-5 ימי עסקים
                         </li>
                       </ul>
@@ -372,7 +544,7 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
                     <Button onClick={() => onComplete?.(orderId)} data-testid="button-to-dashboard">
                       לפאנל שלי
                     </Button>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={onBack}>
                       צפה בדיל
                     </Button>
                   </div>
@@ -400,7 +572,7 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
                 
                 <div className="space-y-2 pt-4 border-t">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">מחיר מקורי</span>
+                    <span className="text-muted-foreground">מחיר התחלתי</span>
                     <span className="line-through">₪{deal.originalPrice.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm text-success">
@@ -431,11 +603,11 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
                 <div className="space-y-2 pt-4 border-t text-xs text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Shield className="h-3.5 w-3.5 text-primary" />
-                    <span>תשלום מאובטח ישירות לספק</span>
+                    <span>תשלום מאובטח</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Lock className="h-3.5 w-3.5 text-primary" />
-                    <span>המחיר נעול - זה המחיר המקסימלי</span>
+                    <span>חיוב רק לאחר סגירת הדיל</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <TrendingDown className="h-3.5 w-3.5 text-success" />
