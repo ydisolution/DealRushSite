@@ -141,6 +141,13 @@ export default function Header({
           ) : (
             <>
               <Button 
+                size="sm" 
+                onClick={onRegister}
+                data-testid="button-register"
+              >
+                הרשמה
+              </Button>
+              <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={onLogin}
@@ -148,13 +155,6 @@ export default function Header({
                 data-testid="button-login"
               >
                 התחברות
-              </Button>
-              <Button 
-                size="sm" 
-                onClick={onRegister}
-                data-testid="button-register"
-              >
-                הרשמה
               </Button>
             </>
           )}

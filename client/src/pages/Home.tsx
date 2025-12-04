@@ -30,6 +30,29 @@ export default function Home({ onOpenAuth }: HomeProps) {
     return Math.max(...deals.map(d => d.originalPrice));
   }, [deals]);
 
+  const heroStats = useMemo(() => {
+    if (deals.length === 0) {
+      return {
+        activeBuyers: 2847,
+        avgDiscount: 35,
+        openDeals: 12,
+      };
+    }
+    
+    const totalParticipants = deals.reduce((sum, deal) => sum + deal.participants, 0);
+    const totalDiscount = deals.reduce((sum, deal) => {
+      const discount = Math.round(((deal.originalPrice - deal.currentPrice) / deal.originalPrice) * 100);
+      return sum + discount;
+    }, 0);
+    const avgDiscount = deals.length > 0 ? Math.round(totalDiscount / deals.length) : 35;
+    
+    return {
+      activeBuyers: totalParticipants > 0 ? totalParticipants : 2847,
+      avgDiscount: avgDiscount > 0 ? avgDiscount : 35,
+      openDeals: deals.length,
+    };
+  }, [deals]);
+
   const transformedDeals = deals.map(deal => ({
     id: deal.id,
     name: deal.name,
@@ -84,6 +107,7 @@ export default function Home({ onOpenAuth }: HomeProps) {
       <HeroSection 
         onGetStarted={() => document.getElementById('deals-section')?.scrollIntoView({ behavior: 'smooth' })}
         onLearnMore={() => setLocation('/how-it-works')}
+        stats={heroStats}
       />
       <Categories 
         selectedCategory={selectedCategory}
