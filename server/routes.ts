@@ -691,6 +691,7 @@ export async function registerRoutes(
     email: z.string().email().optional(),
     phone: z.string().optional(),
     paymentMethodId: z.string().optional(),
+    quantity: z.number().int().min(1).max(10).optional().default(1),
   });
 
   app.post("/api/deals/:id/join", isAuthenticated, async (req: Request, res: Response) => {
@@ -706,7 +707,7 @@ export async function registerRoutes(
         });
       }
       
-      const { name, email, phone, paymentMethodId } = validationResult.data;
+      const { name, email, phone, paymentMethodId, quantity } = validationResult.data;
       
       const user = await storage.getUser(sessionUserId);
       if (!user) {
@@ -744,41 +745,50 @@ export async function registerRoutes(
 
       const existingParticipants = await storage.getParticipantsByDeal(dealId);
       
-      const alreadyJoined = existingParticipants.some(p => p.userId === sessionUserId);
-      if (alreadyJoined) {
-        return res.status(400).json({ error: "כבר הצטרפת לדיל הזה" });
+      const participantName = name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || "משתתף אנונימי";
+      const participantEmail = email || user.email;
+      const participantPhone = phone || user.phone || null;
+      
+      const createdParticipants = [];
+      let firstParticipant = null;
+      
+      for (let i = 0; i < quantity; i++) {
+        const newPosition = existingParticipants.length + createdParticipants.length + 1;
+        
+        const tierIndex = deal.tiers.findIndex(t => 
+          newPosition >= t.minParticipants && newPosition <= t.maxParticipants
+        );
+        const tier = deal.tiers[tierIndex !== -1 ? tierIndex : deal.tiers.length - 1];
+        
+        const positionInTier = newPosition - tier.minParticipants;
+        const tierRange = tier.maxParticipants - tier.minParticipants + 1;
+        const positionRatio = positionInTier / tierRange;
+        const priceVariance = (positionRatio - 0.5) * 0.05;
+        const basePrice = tier.price || deal.originalPrice * (1 - tier.discount / 100);
+        const pricePaid = Math.round(basePrice * (1 + priceVariance));
+        
+        const participantData = {
+          dealId,
+          name: quantity > 1 ? `${participantName} (יחידה ${i + 1}/${quantity})` : participantName,
+          userId: sessionUserId,
+          email: participantEmail,
+          phone: participantPhone,
+          pricePaid,
+          position: newPosition,
+          paymentStatus: "card_validated",
+          stripePaymentMethodId: pmId,
+          tierAtJoin: tierIndex !== -1 ? tierIndex : deal.tiers.length - 1,
+          cardLast4: cardValidation.last4 || null,
+          cardBrand: cardValidation.brand || null,
+        };
+        
+        const participant = await storage.addParticipant(participantData);
+        createdParticipants.push(participant);
+        
+        if (i === 0) {
+          firstParticipant = participant;
+        }
       }
-      
-      const newPosition = existingParticipants.length + 1;
-      
-      const tierIndex = deal.tiers.findIndex(t => 
-        newPosition >= t.minParticipants && newPosition <= t.maxParticipants
-      );
-      const tier = deal.tiers[tierIndex !== -1 ? tierIndex : deal.tiers.length - 1];
-      
-      const positionInTier = newPosition - tier.minParticipants;
-      const tierRange = tier.maxParticipants - tier.minParticipants + 1;
-      const positionRatio = positionInTier / tierRange;
-      const priceVariance = (positionRatio - 0.5) * 0.05;
-      const basePrice = tier.price || deal.originalPrice * (1 - tier.discount / 100);
-      const pricePaid = Math.round(basePrice * (1 + priceVariance));
-      
-      const participantData = {
-        dealId,
-        name: name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || "משתתף אנונימי",
-        userId: sessionUserId,
-        email: email || user.email,
-        phone: phone || user.phone || null,
-        pricePaid,
-        position: newPosition,
-        paymentStatus: "card_validated",
-        stripePaymentMethodId: pmId,
-        tierAtJoin: tierIndex !== -1 ? tierIndex : deal.tiers.length - 1,
-        cardLast4: cardValidation.last4 || null,
-        cardBrand: cardValidation.brand || null,
-      };
-      
-      const participant = await storage.addParticipant(participantData);
       
       const updatedParticipants = await storage.getParticipantsByDeal(dealId);
       const newParticipantCount = updatedParticipants.length;
@@ -798,7 +808,7 @@ export async function registerRoutes(
       notificationService.notifyParticipantJoined(
         dealId,
         deal.name,
-        participantData.name,
+        participantName,
         newParticipantCount,
         newCurrentPrice
       );
@@ -818,15 +828,24 @@ export async function registerRoutes(
         });
       }
 
-      const participantEmail = email || user.email;
       if (participantEmail) {
-        sendDealJoinNotification(participantEmail, deal.name, pricePaid, newPosition).catch(err => {
+        const totalPaid = createdParticipants.reduce((sum, p) => sum + p.pricePaid, 0);
+        const firstPosition = firstParticipant?.position || 1;
+        sendDealJoinNotification(
+          participantEmail, 
+          deal.name, 
+          totalPaid, 
+          firstPosition,
+          quantity
+        ).catch(err => {
           console.error("Failed to send join notification email:", err);
         });
       }
 
       res.status(201).json({ 
-        participant,
+        participant: firstParticipant,
+        participants: createdParticipants,
+        quantity,
         newParticipantCount,
         newPrice: newCurrentPrice,
       });

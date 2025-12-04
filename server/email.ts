@@ -107,10 +107,19 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 export async function sendDealJoinNotification(
   toEmail: string,
   dealName: string,
-  currentPrice: number,
-  position: number
+  totalPrice: number,
+  position: number,
+  quantity: number = 1
 ): Promise<boolean> {
-  const subject = `הצטרפת בהצלחה לדיל: ${dealName}`;
+  const subject = quantity > 1 
+    ? `הצטרפת בהצלחה לדיל: ${dealName} (${quantity} יחידות)`
+    : `הצטרפת בהצלחה לדיל: ${dealName}`;
+  
+  const quantityInfo = quantity > 1 
+    ? `<p><strong>כמות:</strong> ${quantity} יחידות</p>`
+    : '';
+  
+  const priceLabel = quantity > 1 ? 'סה"כ לתשלום' : 'המחיר הנוכחי שלך';
   
   const htmlBody = `
     <!DOCTYPE html>
@@ -136,8 +145,9 @@ export async function sendDealJoinNotification(
         <div class="content">
           <h2>${dealName}</h2>
           <div class="info-box">
-            <p><strong>המחיר הנוכחי שלך:</strong></p>
-            <p class="price">₪${currentPrice.toLocaleString()}</p>
+            ${quantityInfo}
+            <p><strong>${priceLabel}:</strong></p>
+            <p class="price">₪${totalPrice.toLocaleString()}</p>
           </div>
           <div class="info-box">
             <p><strong>מיקום בתור:</strong> #${position}</p>

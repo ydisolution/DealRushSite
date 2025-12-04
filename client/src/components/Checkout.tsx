@@ -21,7 +21,9 @@ import {
   Building,
   Shield,
   Flame,
-  Loader2
+  Loader2,
+  Plus,
+  Minus
 } from "lucide-react";
 
 interface CheckoutProps {
@@ -72,11 +74,13 @@ const cardElementOptions = {
 function PaymentForm({ 
   deal, 
   shippingInfo, 
+  quantity,
   onSuccess, 
   onBack 
 }: { 
   deal: CheckoutProps['deal']; 
   shippingInfo: any; 
+  quantity: number;
   onSuccess: (orderId: string, position: number) => void;
   onBack: () => void;
 }) {
@@ -162,6 +166,7 @@ function PaymentForm({
           email: user?.email,
           phone: shippingInfo.phone,
           paymentMethodId: setupIntent.payment_method,
+          quantity,
         });
 
         const joinData = await joinRes.json();
@@ -294,6 +299,7 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [position, setPosition] = useState<number | null>(null);
   const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
+  const [quantity, setQuantity] = useState(1);
   const { toast } = useToast();
   
   const [shippingInfo, setShippingInfo] = useState({
@@ -303,6 +309,20 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
     city: "",
     zipCode: "",
   });
+  
+  const maxQuantity = 10;
+  
+  const increaseQuantity = () => {
+    if (quantity < maxQuantity) {
+      setQuantity(prev => prev + 1);
+    }
+  };
+  
+  const decreaseQuantity = () => {
+    if (quantity > 1) {
+      setQuantity(prev => prev - 1);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/stripe/publishable-key")
@@ -322,8 +342,10 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
       });
   }, []);
 
-  const savings = deal.originalPrice - deal.currentPrice;
-  const discount = Math.round((savings / deal.originalPrice) * 100);
+  const unitSavings = deal.originalPrice - deal.currentPrice;
+  const discount = Math.round((unitSavings / deal.originalPrice) * 100);
+  const totalSavings = unitSavings * quantity;
+  const totalPrice = deal.currentPrice * quantity;
 
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -481,6 +503,7 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
                 <PaymentForm 
                   deal={deal}
                   shippingInfo={shippingInfo}
+                  quantity={quantity}
                   onSuccess={handlePaymentSuccess}
                   onBack={() => setStep("shipping")}
                 />
@@ -570,14 +593,49 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
                   </div>
                 </div>
                 
+                <div className="pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">כמות</span>
+                    <div className="flex items-center gap-3">
+                      <Button 
+                        size="icon" 
+                        variant="outline"
+                        className="h-8 w-8"
+                        onClick={decreaseQuantity}
+                        disabled={quantity <= 1}
+                        data-testid="button-decrease-quantity"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <span className="font-semibold w-8 text-center" data-testid="text-quantity">{quantity}</span>
+                      <Button 
+                        size="icon" 
+                        variant="outline"
+                        className="h-8 w-8"
+                        onClick={increaseQuantity}
+                        disabled={quantity >= maxQuantity}
+                        data-testid="button-increase-quantity"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="space-y-2 pt-4 border-t">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">מחיר התחלתי</span>
-                    <span className="line-through">₪{deal.originalPrice.toLocaleString()}</span>
+                    <span className="text-muted-foreground">מחיר ליחידה</span>
+                    <span>₪{deal.currentPrice.toLocaleString()}</span>
                   </div>
+                  {quantity > 1 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">מחיר מקורי ({quantity} יח')</span>
+                      <span className="line-through">₪{(deal.originalPrice * quantity).toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm text-success">
                     <span>חיסכון ({discount}%)</span>
-                    <span>-₪{savings.toLocaleString()}</span>
+                    <span>-₪{totalSavings.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">משלוח</span>
@@ -587,7 +645,7 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
                 
                 <div className="flex justify-between pt-4 border-t">
                   <span className="font-semibold">סה"כ לתשלום</span>
-                  <span className="text-xl font-bold text-primary">₪{deal.currentPrice.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-primary">₪{totalPrice.toLocaleString()}</span>
                 </div>
 
                 {deal.supplierName && (
