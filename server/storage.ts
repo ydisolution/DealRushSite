@@ -408,6 +408,14 @@ export class MemStorage implements IStorage {
     return Array.from(this.usersMap.values()).find(u => u.email === email);
   }
 
+  async getUserByVerificationToken(token: string): Promise<User | undefined> {
+    return Array.from(this.usersMap.values()).find(u => u.emailVerificationToken === token);
+  }
+
+  async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
+    return Array.from(this.usersMap.values()).find(u => u.passwordResetToken === token);
+  }
+
   async upsertUser(userData: UpsertUser): Promise<User> {
     const existing = userData.id ? this.usersMap.get(userData.id) : undefined;
     const user: User = {
@@ -547,6 +555,7 @@ export class MemStorage implements IStorage {
           name: randomName,
           email: null,
           phone: null,
+          quantity: 1,
           pricePaid,
           position,
           joinedAt: joinTime,
@@ -591,6 +600,7 @@ export class MemStorage implements IStorage {
       name: insertParticipant.name,
       email: insertParticipant.email ?? null,
       phone: insertParticipant.phone ?? null,
+      quantity: insertParticipant.quantity ?? 1,
       pricePaid: insertParticipant.pricePaid,
       position: insertParticipant.position,
       joinedAt: new Date(),

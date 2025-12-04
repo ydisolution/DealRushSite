@@ -6,6 +6,7 @@ interface ProgressBarProps {
   showLabel?: boolean;
   size?: "sm" | "md" | "lg";
   variant?: "default" | "success" | "warning";
+  label?: string;
 }
 
 export default function ProgressBar({ 
@@ -13,7 +14,8 @@ export default function ProgressBar({
   target, 
   showLabel = true,
   size = "md",
-  variant = "default"
+  variant = "default",
+  label = "משתתפים"
 }: ProgressBarProps) {
   const percentage = Math.min((current / target) * 100, 100);
   
@@ -36,7 +38,7 @@ export default function ProgressBar({
           <span className="text-muted-foreground">התקדמות</span>
           <span className="font-medium">
             <span className="text-foreground">{current}</span>
-            <span className="text-muted-foreground"> / {target} משתתפים</span>
+            <span className="text-muted-foreground"> / {target} {label}</span>
           </span>
         </div>
       )}

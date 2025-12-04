@@ -859,6 +859,164 @@ export async function registerRoutes(
     }
   });
 
+  const registerWithoutPaymentSchema = z.object({
+    name: z.string().min(1).max(100).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().optional(),
+    quantity: z.number().int().min(1).max(10).optional().default(1),
+  });
+
+  app.post("/api/deals/:id/register-without-payment", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const dealId = req.params.id;
+      const sessionUserId = req.session.userId!;
+      
+      const validationResult = registerWithoutPaymentSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: validationResult.error.errors 
+        });
+      }
+      
+      const { name, email, phone, quantity } = validationResult.data;
+      
+      const user = await storage.getUser(sessionUserId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const deal = await storage.getDeal(dealId);
+      
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      if (deal.isActive !== "true") {
+        return res.status(400).json({ error: "הדיל כבר נסגר" });
+      }
+
+      const existingParticipants = await storage.getParticipantsByDeal(dealId);
+      
+      const existingUserParticipation = existingParticipants.find(p => p.userId === sessionUserId);
+      if (existingUserParticipation) {
+        return res.status(400).json({ error: "כבר נרשמת לדיל זה" });
+      }
+      
+      const participantName = name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || "משתתף אנונימי";
+      const participantEmail = email || user.email;
+      const participantPhone = phone || user.phone || null;
+      
+      const totalUnitsSold = existingParticipants.reduce((sum, p) => sum + (p.quantity || 1), 0);
+      
+      const createdParticipants = [];
+      let firstParticipant = null;
+      
+      for (let i = 0; i < quantity; i++) {
+        const newUnitPosition = totalUnitsSold + i + 1;
+        const newPosition = existingParticipants.length + (i === 0 ? 1 : 0);
+        
+        const tierIndex = deal.tiers.findIndex(t => 
+          newUnitPosition >= t.minParticipants && newUnitPosition <= t.maxParticipants
+        );
+        
+        let effectivePrice = deal.originalPrice;
+        if (tierIndex !== -1) {
+          const tier = deal.tiers[tierIndex];
+          effectivePrice = tier.price || Math.round(deal.originalPrice * (1 - tier.discount / 100));
+        } else if (newUnitPosition < deal.tiers[0]?.minParticipants) {
+          effectivePrice = deal.originalPrice;
+        }
+        
+        const participantData = {
+          dealId,
+          name: quantity > 1 ? `${participantName} (יחידה ${i + 1}/${quantity})` : participantName,
+          userId: sessionUserId,
+          email: participantEmail,
+          phone: participantPhone,
+          quantity: i === 0 ? quantity : 0,
+          pricePaid: effectivePrice,
+          position: newPosition,
+          paymentStatus: "pending_paypal",
+          tierAtJoin: tierIndex !== -1 ? tierIndex : null,
+        };
+        
+        if (i === 0) {
+          const participant = await storage.addParticipant(participantData);
+          createdParticipants.push(participant);
+          firstParticipant = participant;
+        }
+      }
+      
+      const newTotalUnits = totalUnitsSold + quantity;
+      const newParticipantCount = existingParticipants.length + 1;
+      
+      const newTierIndex = deal.tiers.findIndex(t => 
+        newTotalUnits >= t.minParticipants && newTotalUnits <= t.maxParticipants
+      );
+      
+      let newCurrentPrice = deal.originalPrice;
+      if (newTierIndex !== -1) {
+        const currentTier = deal.tiers[newTierIndex];
+        newCurrentPrice = currentTier.price || Math.round(deal.originalPrice * (1 - currentTier.discount / 100));
+      } else if (newTotalUnits < deal.tiers[0]?.minParticipants) {
+        newCurrentPrice = deal.originalPrice;
+      }
+      
+      await storage.updateDeal(dealId, { 
+        participants: newParticipantCount,
+        currentPrice: newCurrentPrice,
+      });
+
+      notificationService.notifyParticipantJoined(
+        dealId,
+        deal.name,
+        participantName,
+        newParticipantCount,
+        newCurrentPrice
+      );
+
+      const previousTierIndex = totalUnitsSold > 0 
+        ? deal.tiers.findIndex(t => totalUnitsSold >= t.minParticipants && totalUnitsSold <= t.maxParticipants)
+        : -1;
+      
+      if (newTierIndex !== -1 && newTierIndex > previousTierIndex) {
+        const oldPrice = previousTierIndex >= 0 
+          ? (deal.tiers[previousTierIndex].price || Math.round(deal.originalPrice * (1 - deal.tiers[previousTierIndex].discount / 100)))
+          : deal.originalPrice;
+        
+        dealClosureService.notifyTierUnlocked(deal, newTierIndex, oldPrice, newCurrentPrice).catch(err => {
+          console.error("Failed to notify tier unlock:", err);
+        });
+      }
+
+      if (participantEmail) {
+        const totalPrice = quantity * (firstParticipant?.pricePaid || deal.originalPrice);
+        sendDealJoinNotification(
+          participantEmail, 
+          deal.name, 
+          totalPrice, 
+          firstParticipant?.position || 1,
+          quantity
+        ).catch(err => {
+          console.error("Failed to send join notification email:", err);
+        });
+      }
+
+      res.status(201).json({ 
+        participant: firstParticipant,
+        quantity,
+        newParticipantCount,
+        newTotalUnits,
+        newPrice: newCurrentPrice,
+        message: "נרשמת בהצלחה! קישור לתשלום יישלח לאימייל שלך"
+      });
+    } catch (error) {
+      console.error("Error registering for deal:", error);
+      res.status(500).json({ error: "Failed to register for deal" });
+    }
+  });
+
   // Admin Analytics API
   app.get("/api/admin/analytics", isAdmin, async (req: Request, res: Response) => {
     try {

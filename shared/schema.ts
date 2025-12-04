@@ -114,6 +114,7 @@ export type CategoryId = typeof CATEGORIES[number]["id"];
 
 export const PaymentStatus = {
   PENDING: "pending",
+  PENDING_PAYPAL: "pending_paypal",
   CARD_VALIDATED: "card_validated",
   CARD_FAILED: "card_failed",
   CHARGED: "charged",
@@ -131,6 +132,7 @@ export const participants = pgTable("participants", {
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
+  quantity: integer("quantity").notNull().default(1),
   pricePaid: integer("price_paid").notNull(),
   position: integer("position").notNull(),
   joinedAt: timestamp("joined_at").notNull().default(sql`now()`),
@@ -153,6 +155,7 @@ export const participantSchema = z.object({
   name: z.string(),
   email: z.string().nullable(),
   phone: z.string().nullable(),
+  quantity: z.number().default(1),
   pricePaid: z.number(),
   position: z.number(),
   joinedAt: z.date(),

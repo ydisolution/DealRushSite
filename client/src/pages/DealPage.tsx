@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import DealDetail from "@/components/DealDetail";
@@ -37,6 +38,10 @@ export default function DealPage({ onOpenAuth }: DealPageProps) {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [id]);
 
   const { data: deal, isLoading, error } = useQuery<Deal>({
     queryKey: ["/api/deals", id],

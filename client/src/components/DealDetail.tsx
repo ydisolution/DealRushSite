@@ -16,16 +16,13 @@ import {
   Star,
   Check,
   Flame,
-  Zap,
   Clock,
-  ArrowLeft
+  Package,
+  ShoppingCart
 } from "lucide-react";
 import { motion } from "framer-motion";
-import CountdownTimer from "./CountdownTimer";
 import FomoCountdownTimer from "./FomoCountdownTimer";
-import PriceDisplay from "./PriceDisplay";
 import ProgressBar from "./ProgressBar";
-import TierProgress from "./TierProgress";
 import ActivityFeed from "./ActivityFeed";
 import ParticipantsList from "./ParticipantsList";
 import { calculatePositionPricing } from "@/lib/pricing";
@@ -56,6 +53,7 @@ interface DealDetailProps {
       date: Date;
     }>;
   };
+  totalUnitsSold?: number;
   activities: Array<{
     id: string;
     type: "join" | "price_drop";
@@ -67,7 +65,7 @@ interface DealDetailProps {
   onBack?: () => void;
 }
 
-export default function DealDetail({ deal, activities, onJoin, onBack }: DealDetailProps) {
+export default function DealDetail({ deal, totalUnitsSold = 0, activities, onJoin, onBack }: DealDetailProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState("description");
 
@@ -85,46 +83,55 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
     reviews = [],
   } = deal;
 
-  const savings = originalPrice - currentPrice;
-  const discount = Math.round((savings / originalPrice) * 100);
-  const { firstBuyerPrice, lastBuyerPrice, avgPrice } = calculatePositionPricing(currentPrice);
-
-  const getNextTierInfo = () => {
-    const sortedTiers = [...tiers].sort((a, b) => a.minParticipants - b.minParticipants);
-    const currentTierIndex = sortedTiers.findIndex(t => 
-      participants >= t.minParticipants && participants <= t.maxParticipants
-    );
-    
-    if (currentTierIndex === -1 || currentTierIndex >= sortedTiers.length - 1) {
-      return null;
+  const unitsSold = totalUnitsSold || participants;
+  
+  const sortedTiers = [...tiers].sort((a, b) => a.minParticipants - b.minParticipants);
+  
+  const getCurrentTierInfo = () => {
+    for (let i = 0; i < sortedTiers.length; i++) {
+      const tier = sortedTiers[i];
+      if (unitsSold < tier.minParticipants) {
+        return {
+          currentTierIndex: i > 0 ? i - 1 : -1,
+          currentTier: i > 0 ? sortedTiers[i - 1] : null,
+          nextTier: tier,
+          unitsNeeded: tier.minParticipants - unitsSold,
+          hasDiscount: i > 0,
+          currentDiscount: i > 0 ? sortedTiers[i - 1].discount : 0,
+          currentPrice: i > 0 
+            ? (sortedTiers[i - 1].price || Math.round(originalPrice * (1 - sortedTiers[i - 1].discount / 100)))
+            : originalPrice,
+        };
+      }
+      if (unitsSold >= tier.minParticipants && unitsSold <= tier.maxParticipants) {
+        const nextTier = sortedTiers[i + 1] || null;
+        return {
+          currentTierIndex: i,
+          currentTier: tier,
+          nextTier: nextTier,
+          unitsNeeded: nextTier ? nextTier.minParticipants - unitsSold : 0,
+          hasDiscount: true,
+          currentDiscount: tier.discount,
+          currentPrice: tier.price || Math.round(originalPrice * (1 - tier.discount / 100)),
+        };
+      }
     }
-    
-    const nextTier = sortedTiers[currentTierIndex + 1];
-    const participantsNeeded = nextTier.minParticipants - participants;
-    
-    if (!nextTier.price) {
-      const calculatedPrice = Math.round(originalPrice * (1 - nextTier.discount / 100));
-      const priceDrop = currentPrice - calculatedPrice;
-      
-      return {
-        participantsNeeded,
-        nextDiscount: nextTier.discount,
-        nextPrice: calculatedPrice,
-        priceDrop,
-      };
-    }
-    
-    const priceDrop = currentPrice - nextTier.price;
-    
+    const lastTier = sortedTiers[sortedTiers.length - 1];
     return {
-      participantsNeeded,
-      nextDiscount: nextTier.discount,
-      nextPrice: nextTier.price,
-      priceDrop,
+      currentTierIndex: sortedTiers.length - 1,
+      currentTier: lastTier,
+      nextTier: null,
+      unitsNeeded: 0,
+      hasDiscount: true,
+      currentDiscount: lastTier.discount,
+      currentPrice: lastTier.price || Math.round(originalPrice * (1 - lastTier.discount / 100)),
     };
   };
 
-  const nextTierInfo = getNextTierInfo();
+  const tierInfo = getCurrentTierInfo();
+  const effectivePrice = tierInfo.hasDiscount ? tierInfo.currentPrice : originalPrice;
+  const savings = originalPrice - effectivePrice;
+  const discount = tierInfo.hasDiscount ? tierInfo.currentDiscount : 0;
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -134,20 +141,16 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
     setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
-  const recentParticipants = [
-    "דנה מ.",
-    "יוסי א.",
-    "שירה כ.",
-    "אבי ל.",
-    "רונית ש.",
-  ];
+  const tiersWithUnitsNeeded = sortedTiers.map((tier, index) => {
+    const unitsNeeded = Math.max(0, tier.minParticipants - unitsSold);
+    const isCurrentTier = tierInfo.currentTierIndex === index;
+    const isUnlocked = unitsSold >= tier.minParticipants;
+    return { ...tier, unitsNeeded, isCurrentTier, isUnlocked, tierNumber: index + 1 };
+  });
 
-  const tiersWithPeopleNeeded = tiers.map((tier, index) => {
-    const peopleNeeded = Math.max(0, tier.minParticipants - participants);
-    const isCurrentTier = participants >= tier.minParticipants && participants <= tier.maxParticipants;
-    const isUnlocked = participants >= tier.minParticipants;
-    return { ...tier, peopleNeeded, isCurrentTier, isUnlocked, tierNumber: index + 1 };
-  }).sort((a, b) => a.minParticipants - b.minParticipants);
+  const shortDescription = description.length > 120 
+    ? description.substring(0, 120) + "..." 
+    : description;
 
   return (
     <div className="min-h-screen bg-background" data-testid="deal-detail">
@@ -167,70 +170,18 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
           animate={{ opacity: 1, y: 0 }}
           className="max-w-4xl mx-auto"
         >
-          <div className="text-center mb-8">
-            <Badge variant="secondary" className="mb-4 text-sm px-4 py-1">
-              <Users className="h-3.5 w-3.5 ml-1" />
-              {participants} משתתפים
-            </Badge>
-            <h1 className="text-3xl md:text-4xl font-bold mb-3" data-testid="deal-title">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold mb-2" data-testid="deal-title">
               {name}
             </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              {description}
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              {shortDescription}
             </p>
           </div>
 
-          <Card className="mb-8 overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5">
-            <CardContent className="p-6">
-              <div className="grid md:grid-cols-2 gap-6 items-center">
-                <div className="text-center md:text-right space-y-4">
-                  <div className="flex items-center justify-center md:justify-start gap-2">
-                    <Clock className="h-5 w-5 text-primary" />
-                    <span className="text-sm font-medium">הזמן אוזל!</span>
-                  </div>
-                  <FomoCountdownTimer endTime={endTime} size="lg" showEndDate={true} />
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="flex items-end justify-center md:justify-end gap-4">
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-1">מחיר מקורי</p>
-                      <p className="text-2xl font-bold line-through text-muted-foreground">
-                        ₪{originalPrice.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <Badge variant="destructive" className="mb-1 text-sm">
-                        {discount}% הנחה
-                      </Badge>
-                      <p className="text-3xl font-bold text-primary">
-                        ₪{currentPrice.toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-center md:text-left text-success font-medium">
-                    חוסכים ₪{savings.toLocaleString()}!
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-center mb-8">
-            <Button 
-              size="lg" 
-              className="gap-2 text-lg px-12 py-6 shadow-lg shadow-primary/25 hover:shadow-xl"
-              onClick={onJoin}
-              data-testid="button-join-deal"
-            >
-              <TrendingDown className="h-5 w-5" />
-              הצטרפו עכשיו וחסכו ₪{savings.toLocaleString()}
-            </Button>
-          </div>
-
-          <div className="relative mb-10">
-            <div className="max-w-lg mx-auto">
-              <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-muted shadow-xl">
+          <div className="relative mb-6">
+            <div className="max-w-md mx-auto">
+              <div className="relative aspect-square rounded-xl overflow-hidden bg-muted shadow-lg">
                 <img 
                   src={images[currentImageIndex]} 
                   alt={name}
@@ -242,7 +193,7 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
                     <Button 
                       variant="secondary" 
                       size="icon"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 shadow-lg"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 shadow-lg"
                       onClick={prevImage}
                       data-testid="button-prev-image"
                     >
@@ -251,7 +202,7 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
                     <Button 
                       variant="secondary" 
                       size="icon"
-                      className="absolute left-3 top-1/2 -translate-y-1/2 shadow-lg"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 shadow-lg"
                       onClick={nextImage}
                       data-testid="button-next-image"
                     >
@@ -262,12 +213,12 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
               </div>
               
               {images.length > 1 && (
-                <div className="flex justify-center gap-2 mt-4">
+                <div className="flex justify-center gap-2 mt-3">
                   {images.map((img, idx) => (
                     <button
                       key={idx}
                       onClick={() => setCurrentImageIndex(idx)}
-                      className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                      className={`shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all ${
                         idx === currentImageIndex ? "border-primary ring-2 ring-primary/30" : "border-transparent opacity-70 hover:opacity-100"
                       }`}
                       data-testid={`thumbnail-${idx}`}
@@ -280,53 +231,69 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-3 p-4 rounded-lg bg-muted/50 mb-8">
-            <div className="flex -space-x-2 space-x-reverse">
-              {recentParticipants.slice(0, 5).map((pname, idx) => (
-                <Avatar key={idx} className="h-9 w-9 border-2 border-background">
-                  <AvatarFallback className="text-xs bg-accent">
-                    {pname.split(" ").map(n => n[0]).join("")}
-                  </AvatarFallback>
-                </Avatar>
-              ))}
-            </div>
-            <p className="text-sm">
-              <span className="font-bold text-lg">{participants}</span>
-              <span className="text-muted-foreground"> אנשים כבר הצטרפו לדיל</span>
-            </p>
-          </div>
+          <Card className="mb-6 overflow-hidden">
+            <CardContent className="p-4 md:p-6">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex-1 w-full md:w-auto" dir="ltr">
+                  <FomoCountdownTimer endTime={endTime} size="md" showEndDate={true} />
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  {discount > 0 && (
+                    <Badge variant="destructive" className="text-sm px-2 py-1">
+                      {discount}%
+                    </Badge>
+                  )}
+                  <div className="text-left">
+                    {discount > 0 ? (
+                      <>
+                        <p className="text-sm text-muted-foreground line-through">
+                          ₪{originalPrice.toLocaleString()}
+                        </p>
+                        <p className="text-2xl font-bold text-primary">
+                          ₪{effectivePrice.toLocaleString()}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-muted-foreground">מחיר מלא</p>
+                        <p className="text-2xl font-bold">
+                          ₪{originalPrice.toLocaleString()}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {savings > 0 && (
+                <p className="text-center text-success font-medium mt-3">
+                  חוסכים ₪{savings.toLocaleString()}!
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-          <ProgressBar 
-            current={participants} 
-            target={targetParticipants}
-            size="lg"
-          />
-
-          {nextTierInfo && nextTierInfo.participantsNeeded > 0 && (
+          {!tierInfo.hasDiscount && sortedTiers.length > 0 && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3 }}
             >
-              <Card className="border-urgent/50 bg-gradient-to-r from-urgent/10 to-warning/10 mt-6" data-testid="fomo-banner">
+              <Card className="border-warning/50 bg-gradient-to-r from-warning/10 to-accent/10 mb-6" data-testid="no-discount-banner">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-urgent/20 animate-pulse">
-                      <Flame className="h-6 w-6 text-urgent" />
+                    <div className="p-2 rounded-full bg-warning/20">
+                      <Package className="h-6 w-6 text-warning" />
                     </div>
                     <div className="flex-1">
                       <p className="font-bold text-lg">
-                        עוד רק{" "}
-                        <span className="text-urgent text-xl">{nextTierInfo.participantsNeeded}</span>{" "}
-                        מצטרפים למדרגה הבאה!
+                        עוד{" "}
+                        <span className="text-warning text-xl">{tierInfo.unitsNeeded}</span>{" "}
+                        יחידות להפעלת ההנחה!
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        כשנגיע ל-{nextTierInfo.nextDiscount}% הנחה, המחיר יירד ב-₪{nextTierInfo.priceDrop.toLocaleString()} נוספים
+                        כשנגיע ל-{sortedTiers[0].minParticipants} יחידות, כולם יקבלו {sortedTiers[0].discount}% הנחה
                       </p>
-                    </div>
-                    <div className="text-left">
-                      <p className="text-xs text-muted-foreground">מחיר הבא</p>
-                      <p className="text-lg font-bold text-success">₪{nextTierInfo.nextPrice.toLocaleString()}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -334,17 +301,84 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
             </motion.div>
           )}
 
-          <Card className="mt-8 mb-8">
-            <CardContent className="p-6">
+          {tierInfo.hasDiscount && tierInfo.nextTier && tierInfo.unitsNeeded > 0 && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+            >
+              <Card className="border-urgent/50 bg-gradient-to-r from-urgent/10 to-warning/10 mb-6" data-testid="fomo-banner">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-urgent/20 animate-pulse">
+                      <Flame className="h-6 w-6 text-urgent" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-lg">
+                        עוד{" "}
+                        <span className="text-urgent text-xl">{tierInfo.unitsNeeded}</span>{" "}
+                        יחידות למדרגה הבאה!
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        במדרגה הבאה: {tierInfo.nextTier.discount}% הנחה
+                      </p>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs text-muted-foreground">מחיר הבא</p>
+                      <p className="text-lg font-bold text-success">
+                        ₪{(tierInfo.nextTier.price || Math.round(originalPrice * (1 - tierInfo.nextTier.discount / 100))).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          <div className="flex justify-center mb-6">
+            <Button 
+              size="lg" 
+              className="gap-2 text-lg px-10 py-6 shadow-lg shadow-primary/25 hover:shadow-xl"
+              onClick={onJoin}
+              data-testid="button-join-deal"
+            >
+              <ShoppingCart className="h-5 w-5" />
+              הצטרפו לדיל
+              {savings > 0 && ` - חסכו ₪${savings.toLocaleString()}`}
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 p-3 rounded-lg bg-muted/50 mb-6">
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              <span className="font-bold text-lg">{unitsSold}</span>
+              <span className="text-muted-foreground">יחידות נמכרו</span>
+            </div>
+            <span className="text-muted-foreground">|</span>
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              <span className="font-bold">{participants}</span>
+              <span className="text-muted-foreground">לקוחות</span>
+            </div>
+          </div>
+
+          <ProgressBar 
+            current={unitsSold} 
+            target={targetParticipants}
+            size="lg"
+            label="יחידות"
+          />
+
+          <Card className="mt-6 mb-6">
+            <CardContent className="p-4 md:p-6">
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                 <TrendingDown className="h-5 w-5 text-primary" />
-                מדרגות הנחה - כמה אנשים צריך לכל מדרגה
+                מדרגות הנחה - לפי כמות יחידות
               </h3>
               <div className="space-y-3">
-                {tiersWithPeopleNeeded.map((tier, idx) => (
+                {tiersWithUnitsNeeded.map((tier, idx) => (
                   <div 
                     key={idx}
-                    className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
+                    className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
                       tier.isCurrentTier 
                         ? "border-primary bg-primary/5 ring-1 ring-primary/20" 
                         : tier.isUnlocked 
@@ -353,29 +387,29 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm ${
                         tier.isUnlocked ? "bg-success text-white" : "bg-muted"
                       }`}>
                         {tier.isUnlocked ? (
-                          <Check className="h-5 w-5" />
+                          <Check className="h-4 w-4" />
                         ) : (
                           <span className="font-bold">{tier.tierNumber}</span>
                         )}
                       </div>
                       <div>
                         <p className="font-semibold">{tier.discount}% הנחה</p>
-                        <p className="text-sm text-muted-foreground">
-                          {tier.minParticipants}-{tier.maxParticipants} משתתפים
+                        <p className="text-xs text-muted-foreground">
+                          {tier.minParticipants}-{tier.maxParticipants} יחידות
                         </p>
                       </div>
                     </div>
                     <div className="text-left">
-                      <p className="font-bold text-lg">
+                      <p className="font-bold">
                         ₪{(tier.price || Math.round(originalPrice * (1 - tier.discount / 100))).toLocaleString()}
                       </p>
-                      {!tier.isUnlocked && tier.peopleNeeded > 0 && (
+                      {!tier.isUnlocked && tier.unitsNeeded > 0 && (
                         <Badge variant="outline" className="text-xs">
-                          עוד {tier.peopleNeeded} אנשים
+                          עוד {tier.unitsNeeded} יחידות
                         </Badge>
                       )}
                       {tier.isCurrentTier && (
@@ -390,41 +424,18 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
             </CardContent>
           </Card>
 
-          <Card className="mb-8">
-            <CardContent className="p-4">
-              <p className="text-sm font-medium mb-3">מחיר לפי מיקום הצטרפות במדרגה הנוכחית:</p>
-              <div className="grid grid-cols-3 gap-4 text-sm text-center">
-                <div className="p-3 bg-success/10 rounded-lg">
-                  <span className="text-muted-foreground block">ראשון במדרגה</span>
-                  <span className="font-bold text-success text-lg">₪{firstBuyerPrice.toLocaleString()}</span>
-                </div>
-                <div className="p-3 bg-muted rounded-lg">
-                  <span className="text-muted-foreground block">ממוצע</span>
-                  <span className="font-bold text-lg">₪{avgPrice.toLocaleString()}</span>
-                </div>
-                <div className="p-3 bg-muted rounded-lg">
-                  <span className="text-muted-foreground block">אחרון במדרגה</span>
-                  <span className="font-bold text-lg">₪{lastBuyerPrice.toLocaleString()}</span>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-3 p-2 bg-background/50 rounded text-center">
-                הראשון להצטרף לכל מדרגה מקבל 2.5% הנחה נוספת, האחרון משלם 2.5% יותר
-              </p>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-6">
             <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 justify-center">
               <Lock className="h-4 w-4 text-primary" />
               <span>המחיר נעול עבורכם</span>
             </div>
             <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 justify-center">
               <TrendingDown className="h-4 w-4 text-success" />
-              <span>אם המחיר יורד - תשלמו פחות</span>
+              <span>ירד? תשלמו פחות</span>
             </div>
             <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 justify-center">
               <RefreshCcw className="h-4 w-4 text-primary" />
-              <span>החזר כספי עד 14 ימים</span>
+              <span>החזר עד 14 ימים</span>
             </div>
             <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 justify-center">
               <Truck className="h-4 w-4 text-primary" />
@@ -432,7 +443,7 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
             <div className="lg:col-span-2">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="w-full justify-start">
@@ -441,9 +452,9 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
                   <TabsTrigger value="reviews">ביקורות</TabsTrigger>
                 </TabsList>
                 
-                <TabsContent value="description" className="mt-6">
+                <TabsContent value="description" className="mt-4">
                   <Card>
-                    <CardContent className="p-6 prose prose-sm max-w-none">
+                    <CardContent className="p-4 prose prose-sm max-w-none">
                       <p>{description}</p>
                       <h3>יתרונות עיקריים:</h3>
                       <ul>
@@ -456,10 +467,10 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
                   </Card>
                 </TabsContent>
                 
-                <TabsContent value="specs" className="mt-6">
+                <TabsContent value="specs" className="mt-4">
                   <Card>
-                    <CardContent className="p-6">
-                      <dl className="space-y-3">
+                    <CardContent className="p-4">
+                      <dl className="space-y-2">
                         {specs.map((spec, idx) => (
                           <div key={idx} className="flex justify-between py-2 border-b last:border-0">
                             <dt className="text-muted-foreground">{spec.label}</dt>
@@ -471,17 +482,17 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
                   </Card>
                 </TabsContent>
                 
-                <TabsContent value="reviews" className="mt-6">
+                <TabsContent value="reviews" className="mt-4">
                   <Card>
-                    <CardContent className="p-6 space-y-6">
+                    <CardContent className="p-4 space-y-4">
                       <div className="flex items-center gap-4">
-                        <div className="text-4xl font-bold">4.8</div>
+                        <div className="text-3xl font-bold">4.8</div>
                         <div>
-                          <div className="flex gap-1">
+                          <div className="flex gap-0.5">
                             {[1, 2, 3, 4, 5].map((star) => (
                               <Star 
                                 key={star} 
-                                className={`h-5 w-5 ${star <= 4 ? "fill-warning text-warning" : "fill-warning/30 text-warning/30"}`}
+                                className={`h-4 w-4 ${star <= 4 ? "fill-warning text-warning" : "fill-warning/30 text-warning/30"}`}
                               />
                             ))}
                           </div>
@@ -491,21 +502,21 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
                         </div>
                       </div>
                       
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         {reviews.slice(0, 3).map((review) => (
-                          <div key={review.id} className="border-t pt-4">
+                          <div key={review.id} className="border-t pt-3">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarFallback>{review.userName[0]}</AvatarFallback>
+                                <Avatar className="h-7 w-7">
+                                  <AvatarFallback className="text-xs">{review.userName[0]}</AvatarFallback>
                                 </Avatar>
-                                <span className="font-medium">{review.userName}</span>
+                                <span className="font-medium text-sm">{review.userName}</span>
                               </div>
                               <div className="flex gap-0.5">
                                 {[1, 2, 3, 4, 5].map((star) => (
                                   <Star 
                                     key={star} 
-                                    className={`h-4 w-4 ${star <= review.rating ? "fill-warning text-warning" : "text-muted"}`}
+                                    className={`h-3 w-3 ${star <= review.rating ? "fill-warning text-warning" : "text-muted"}`}
                                   />
                                 ))}
                               </div>
@@ -520,7 +531,7 @@ export default function DealDetail({ deal, activities, onJoin, onBack }: DealDet
               </Tabs>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4">
               <ParticipantsList 
                 dealId={deal.id} 
                 originalPrice={originalPrice} 

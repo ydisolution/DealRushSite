@@ -23,8 +23,10 @@ import {
   Flame,
   Loader2,
   Plus,
-  Minus
+  Minus,
+  Wallet
 } from "lucide-react";
+import { SiPaypal } from "react-icons/si";
 
 interface CheckoutProps {
   deal: {
@@ -71,18 +73,22 @@ const cardElementOptions = {
   hidePostalCode: true,
 };
 
+type PaymentMethod = "card" | "paypal";
+
 function PaymentForm({ 
   deal, 
   shippingInfo, 
   quantity,
   onSuccess, 
-  onBack 
+  onBack,
+  onPayPalSuccess
 }: { 
   deal: CheckoutProps['deal']; 
   shippingInfo: any; 
   quantity: number;
   onSuccess: (orderId: string, position: number) => void;
   onBack: () => void;
+  onPayPalSuccess: (orderId: string, position: number) => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -90,6 +96,8 @@ function PaymentForm({
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
+  const [isPayPalProcessing, setIsPayPalProcessing] = useState(false);
 
   const { data: setupData, isLoading: isLoadingSetup, error: setupError, refetch: refetchSetup } = useQuery({
     queryKey: ["/api/stripe/create-setup-intent"],
@@ -107,6 +115,44 @@ function PaymentForm({
     },
     retry: 2,
   });
+
+  const handlePayPalRegister = async () => {
+    setIsPayPalProcessing(true);
+    
+    try {
+      const res = await apiRequest("POST", `/api/deals/${deal.id}/register-without-payment`, {
+        name: shippingInfo.fullName,
+        email: user?.email,
+        phone: shippingInfo.phone,
+        quantity,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "שגיאה ברישום לדיל");
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals", deal.id] });
+      
+      const orderId = `PP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      onPayPalSuccess(orderId, data.participant?.position || 1);
+      
+      toast({
+        title: "נרשמת בהצלחה!",
+        description: "קישור לתשלום יישלח לאימייל שלך",
+      });
+    } catch (error: any) {
+      toast({
+        title: "שגיאה ברישום לדיל",
+        description: error.message || "אנא נסה שוב מאוחר יותר",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPayPalProcessing(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,68 +274,180 @@ function PaymentForm({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CreditCard className="h-5 w-5 text-primary" />
-          פרטי כרטיס אשראי
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="p-4 border rounded-md bg-background">
-            <Label className="mb-2 block">פרטי כרטיס</Label>
-            <CardElement 
-              options={cardElementOptions} 
-              onChange={(e) => {
-                if (e.error) {
-                  setCardError(e.error.message);
-                } else {
-                  setCardError(null);
-                }
-              }}
-            />
-            {cardError && (
-              <p className="text-destructive text-sm mt-2">{cardError}</p>
-            )}
-          </div>
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">בחר אמצעי תשלום</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setPaymentMethod("card")}
+            className={`w-full p-4 border rounded-lg flex items-center gap-3 transition-all ${
+              paymentMethod === "card" 
+                ? "border-primary bg-primary/5 ring-1 ring-primary/20" 
+                : "border-border hover:border-muted-foreground/30"
+            }`}
+            data-testid="button-payment-card"
+          >
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              paymentMethod === "card" ? "bg-primary text-primary-foreground" : "bg-muted"
+            }`}>
+              <CreditCard className="h-5 w-5" />
+            </div>
+            <div className="text-right flex-1">
+              <p className="font-medium">כרטיס אשראי</p>
+              <p className="text-sm text-muted-foreground">Visa, Mastercard, AMEX</p>
+            </div>
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => setPaymentMethod("paypal")}
+            className={`w-full p-4 border rounded-lg flex items-center gap-3 transition-all ${
+              paymentMethod === "paypal" 
+                ? "border-primary bg-primary/5 ring-1 ring-primary/20" 
+                : "border-border hover:border-muted-foreground/30"
+            }`}
+            data-testid="button-payment-paypal"
+          >
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              paymentMethod === "paypal" ? "bg-[#0070BA] text-white" : "bg-muted"
+            }`}>
+              <SiPaypal className="h-5 w-5" />
+            </div>
+            <div className="text-right flex-1">
+              <p className="font-medium">PayPal</p>
+              <p className="text-sm text-muted-foreground">תשלום מאובטח דרך PayPal</p>
+            </div>
+          </button>
+        </CardContent>
+      </Card>
 
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-            <Lock className="h-4 w-4" />
-            <span>התשלום מאובטח ומוצפן. הכרטיס יחויב רק לאחר סגירת הדיל.</span>
-          </div>
+      {paymentMethod === "card" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-primary" />
+              פרטי כרטיס אשראי
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="p-4 border rounded-md bg-background">
+                <Label className="mb-2 block">פרטי כרטיס</Label>
+                <CardElement 
+                  options={cardElementOptions} 
+                  onChange={(e) => {
+                    if (e.error) {
+                      setCardError(e.error.message);
+                    } else {
+                      setCardError(null);
+                    }
+                  }}
+                />
+                {cardError && (
+                  <p className="text-destructive text-sm mt-2">{cardError}</p>
+                )}
+              </div>
 
-          <div className="flex gap-2">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onBack}
-              disabled={isProcessing}
-            >
-              חזרה
-            </Button>
-            <Button 
-              type="submit" 
-              className="flex-1 gap-2"
-              disabled={isProcessing || !stripe}
-              data-testid="button-complete-order"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  מעבד...
-                </>
-              ) : (
-                <>
-                  <Lock className="h-4 w-4" />
-                  הצטרף לדיל
-                </>
-              )}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+                <Lock className="h-4 w-4" />
+                <span>התשלום מאובטח ומוצפן. הכרטיס יחויב רק לאחר סגירת הדיל.</span>
+              </div>
+
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={onBack}
+                  disabled={isProcessing}
+                >
+                  חזרה
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="flex-1 gap-2"
+                  disabled={isProcessing || !stripe}
+                  data-testid="button-complete-order"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      מעבד...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-4 w-4" />
+                      הצטרף לדיל
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {paymentMethod === "paypal" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <SiPaypal className="h-5 w-5 text-[#0070BA]" />
+              תשלום באמצעות PayPal
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="p-4 bg-muted/50 rounded-lg text-center space-y-3">
+              <div className="w-16 h-16 mx-auto rounded-full bg-[#0070BA]/10 flex items-center justify-center">
+                <SiPaypal className="h-8 w-8 text-[#0070BA]" />
+              </div>
+              <div>
+                <p className="font-medium">הרשמה מהירה לדיל</p>
+                <p className="text-sm text-muted-foreground">
+                  לאחר ההרשמה, קישור לתשלום יישלח לאימייל שלך
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+              <Shield className="h-4 w-4" />
+              <span>המקום שלך בדיל נשמר והתשלום מאובטח דרך PayPal</span>
+            </div>
+
+            <div className="flex gap-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={onBack}
+                disabled={isPayPalProcessing}
+              >
+                חזרה
+              </Button>
+              <Button 
+                type="button"
+                className="flex-1 gap-2 bg-[#0070BA] hover:bg-[#005EA6]"
+                disabled={isPayPalProcessing}
+                onClick={handlePayPalRegister}
+                data-testid="button-paypal-register"
+              >
+                {isPayPalProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    מעבד...
+                  </>
+                ) : (
+                  <>
+                    <SiPaypal className="h-4 w-4" />
+                    הרשמה לדיל עם PayPal
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
 
@@ -523,6 +681,7 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
                   quantity={quantity}
                   onSuccess={handlePaymentSuccess}
                   onBack={() => setStep("shipping")}
+                  onPayPalSuccess={handlePaymentSuccess}
                 />
               </Elements>
             )}
