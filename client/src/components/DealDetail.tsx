@@ -65,7 +65,7 @@ interface DealDetailProps {
   onBack?: () => void;
 }
 
-export default function DealDetail({ deal, totalUnitsSold = 0, activities, onJoin, onBack }: DealDetailProps) {
+export default function DealDetail({ deal, totalUnitsSold, activities, onJoin, onBack }: DealDetailProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState("description");
 
@@ -83,7 +83,7 @@ export default function DealDetail({ deal, totalUnitsSold = 0, activities, onJoi
     reviews = [],
   } = deal;
 
-  const unitsSold = totalUnitsSold || participants;
+  const unitsSold = totalUnitsSold !== undefined ? totalUnitsSold : 0;
   
   const sortedTiers = [...tiers].sort((a, b) => a.minParticipants - b.minParticipants);
   

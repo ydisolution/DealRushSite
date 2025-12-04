@@ -5,7 +5,7 @@ import DealDetail from "@/components/DealDetail";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
-import type { Deal } from "@shared/schema";
+import type { Deal, Participant } from "@shared/schema";
 
 interface DealPageProps {
   onOpenAuth?: () => void;
@@ -46,6 +46,13 @@ export default function DealPage({ onOpenAuth }: DealPageProps) {
   const { data: deal, isLoading, error } = useQuery<Deal>({
     queryKey: ["/api/deals", id],
   });
+
+  const { data: participants } = useQuery<Participant[]>({
+    queryKey: ["/api/deals", id, "participants"],
+    enabled: !!deal,
+  });
+
+  const totalUnitsSold = participants?.reduce((sum, p) => sum + (p.quantity || 1), 0) || 0;
 
   if (isLoading) {
     return <LoadingSkeleton />;
@@ -105,6 +112,7 @@ export default function DealPage({ onOpenAuth }: DealPageProps) {
   return (
     <DealDetail 
       deal={transformedDeal}
+      totalUnitsSold={totalUnitsSold}
       activities={mockActivities}
       onJoin={handleJoinDeal}
       onBack={() => setLocation('/')}

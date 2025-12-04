@@ -114,6 +114,7 @@ function PaymentForm({
       return res.json();
     },
     retry: 2,
+    enabled: paymentMethod === "card",
   });
 
   const handlePayPalRegister = async () => {
@@ -135,8 +136,9 @@ function PaymentForm({
 
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/deals", deal.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals", deal.id, "participants"] });
       
-      const orderId = `PP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      const orderId = data.participant?.id ? `PP-${data.participant.id.substring(0, 8).toUpperCase()}` : `PP-${Date.now()}`;
       onPayPalSuccess(orderId, data.participant?.position || 1);
       
       toast({
@@ -238,40 +240,8 @@ function PaymentForm({
     }
   };
 
-  if (isLoadingSetup) {
-    return (
-      <Card>
-        <CardContent className="p-8 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="mr-3">טוען מערכת תשלום...</span>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (setupError || !setupData?.clientSecret) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center space-y-4">
-          <div className="w-12 h-12 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
-            <CreditCard className="h-6 w-6 text-destructive" />
-          </div>
-          <h3 className="font-semibold">שגיאה בטעינת מערכת התשלום</h3>
-          <p className="text-sm text-muted-foreground">
-            לא הצלחנו להתחבר למערכת התשלום. נסה שוב.
-          </p>
-          <div className="flex gap-2 justify-center">
-            <Button variant="outline" onClick={onBack}>
-              חזרה
-            </Button>
-            <Button onClick={() => refetchSetup()}>
-              נסה שוב
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const isStripeReady = !isLoadingSetup && setupData?.clientSecret;
+  const hasStripeError = paymentMethod === "card" && setupError;
 
   return (
     <div className="space-y-4">
@@ -333,58 +303,78 @@ function PaymentForm({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="p-4 border rounded-md bg-background">
-                <Label className="mb-2 block">פרטי כרטיס</Label>
-                <CardElement 
-                  options={cardElementOptions} 
-                  onChange={(e) => {
-                    if (e.error) {
-                      setCardError(e.error.message);
-                    } else {
-                      setCardError(null);
-                    }
-                  }}
-                />
-                {cardError && (
-                  <p className="text-destructive text-sm mt-2">{cardError}</p>
-                )}
+            {isLoadingSetup && (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="mr-3">טוען מערכת תשלום...</span>
               </div>
-
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-                <Lock className="h-4 w-4" />
-                <span>התשלום מאובטח ומוצפן. הכרטיס יחויב רק לאחר סגירת הדיל.</span>
+            )}
+            {hasStripeError && (
+              <div className="text-center space-y-4 p-4">
+                <div className="w-12 h-12 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
+                  <CreditCard className="h-6 w-6 text-destructive" />
+                </div>
+                <h3 className="font-semibold">שגיאה בטעינת מערכת התשלום</h3>
+                <p className="text-sm text-muted-foreground">
+                  לא הצלחנו להתחבר למערכת התשלום. נסה שוב או בחר PayPal.
+                </p>
+                <Button onClick={() => refetchSetup()}>נסה שוב</Button>
               </div>
-
-              <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={onBack}
-                  disabled={isProcessing}
-                >
-                  חזרה
-                </Button>
-                <Button 
-                  type="submit" 
-                  className="flex-1 gap-2"
-                  disabled={isProcessing || !stripe}
-                  data-testid="button-complete-order"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      מעבד...
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="h-4 w-4" />
-                      הצטרף לדיל
-                    </>
+            )}
+            {isStripeReady && (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="p-4 border rounded-md bg-background">
+                  <Label className="mb-2 block">פרטי כרטיס</Label>
+                  <CardElement 
+                    options={cardElementOptions} 
+                    onChange={(e) => {
+                      if (e.error) {
+                        setCardError(e.error.message);
+                      } else {
+                        setCardError(null);
+                      }
+                    }}
+                  />
+                  {cardError && (
+                    <p className="text-destructive text-sm mt-2">{cardError}</p>
                   )}
-                </Button>
-              </div>
-            </form>
+                </div>
+
+                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+                  <Lock className="h-4 w-4" />
+                  <span>התשלום מאובטח ומוצפן. הכרטיס יחויב רק לאחר סגירת הדיל.</span>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={onBack}
+                    disabled={isProcessing}
+                  >
+                    חזרה
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    className="flex-1 gap-2"
+                    disabled={isProcessing || !stripe}
+                    data-testid="button-complete-order"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        מעבד...
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="h-4 w-4" />
+                        הצטרף לדיל
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            )}
           </CardContent>
         </Card>
       )}
