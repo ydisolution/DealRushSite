@@ -2,7 +2,7 @@ import { useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
-interface NotificationMessage {
+interface ParticipantJoinedMessage {
   type: "participant_joined";
   dealId: string;
   dealName: string;
@@ -10,6 +10,37 @@ interface NotificationMessage {
   newParticipantCount: number;
   newPrice: number;
 }
+
+interface TierUnlockedMessage {
+  type: "tier_unlocked";
+  dealId: string;
+  dealName: string;
+  tierNumber: number;
+  oldPrice: number;
+  newPrice: number;
+  discountPercent: number;
+}
+
+interface DealClosedMessage {
+  type: "deal_closed";
+  dealId: string;
+  dealName: string;
+  finalPrice: number;
+  participantCount: number;
+}
+
+interface DealCancelledMessage {
+  type: "deal_cancelled";
+  dealId: string;
+  dealName: string;
+  reason: string;
+}
+
+type NotificationMessage = 
+  | ParticipantJoinedMessage 
+  | TierUnlockedMessage 
+  | DealClosedMessage 
+  | DealCancelledMessage;
 
 export function useNotifications() {
   const { toast } = useToast();
@@ -51,6 +82,38 @@ export function useNotifications() {
 
             queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
             queryClient.invalidateQueries({ queryKey: ["/api/deals", message.dealId] });
+          } else if (message.type === "tier_unlocked") {
+            const savings = message.oldPrice - message.newPrice;
+            
+            toast({
+              title: "שלב הנחה חדש נפתח!",
+              description: `${message.dealName}: ${message.discountPercent}% הנחה - חוסכים ₪${savings.toLocaleString()}!`,
+              duration: 8000,
+            });
+
+            queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/deals", message.dealId] });
+          } else if (message.type === "deal_closed") {
+            toast({
+              title: "הדיל נסגר בהצלחה!",
+              description: `${message.dealName}: המחיר הסופי ₪${message.finalPrice.toLocaleString()}`,
+              duration: 10000,
+            });
+
+            queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/deals", message.dealId] });
+            queryClient.invalidateQueries({ queryKey: ["/api/user/purchases"] });
+          } else if (message.type === "deal_cancelled") {
+            toast({
+              title: "הדיל בוטל",
+              description: `${message.dealName}: ${message.reason}`,
+              variant: "destructive",
+              duration: 10000,
+            });
+
+            queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/deals", message.dealId] });
+            queryClient.invalidateQueries({ queryKey: ["/api/user/purchases"] });
           }
         } catch (err) {
           console.error("Failed to parse WebSocket message:", err);

@@ -188,11 +188,12 @@ class DealClosureService {
           continue;
         }
 
-        const paymentIntent = await stripeService.chargeCustomer(
+        const paymentIntent = await stripeService.chargePaymentMethod(
           customerId,
           participant.stripePaymentMethodId,
           finalPrice,
-          `DealRush: ${deal.name}`
+          'ils',
+          { dealId: deal.id, dealName: deal.name }
         );
 
         await storage.updateParticipant(participant.id, {
@@ -289,15 +290,19 @@ class DealClosureService {
     
     if (!tier) return;
 
+    const tierNumber = newTierIndex + 1;
+    const discountPercent = tier.discount;
+
     for (const participant of participants) {
       const email = participant.email;
       if (email) {
         sendTierUnlockedNotification(
           email,
           deal.name,
-          tier.discount,
+          tierNumber,
           oldPrice,
-          newPrice
+          newPrice,
+          discountPercent
         ).catch(err => {
           console.error(`Failed to send tier unlock notification to ${email}:`, err);
         });
@@ -308,10 +313,10 @@ class DealClosureService {
       type: 'tier_unlocked',
       dealId: deal.id,
       dealName: deal.name,
-      tierIndex: newTierIndex,
-      discount: tier.discount,
+      tierNumber,
+      oldPrice,
       newPrice,
-      participantCount: deal.participants,
+      discountPercent,
     });
 
     console.log(`Notified ${participants.length} participants about tier unlock: ${tier.discount}% off`);
