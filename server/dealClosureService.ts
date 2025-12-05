@@ -314,6 +314,7 @@ class DealClosureService {
       dealId: deal.id,
       dealName: deal.name,
       finalPrice: finalBasePrice,
+      originalPrice: deal.originalPrice,
       totalUnitsSold,
       discountPercent,
       participantCount: successCount,

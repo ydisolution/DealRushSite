@@ -26,7 +26,19 @@ interface DealClosedMessage {
   dealId: string;
   dealName: string;
   finalPrice: number;
+  originalPrice?: number;
+  totalUnitsSold?: number;
+  discountPercent?: number;
   participantCount: number;
+}
+
+export interface DealClosedData {
+  dealId: string;
+  dealName: string;
+  finalPrice: number;
+  originalPrice?: number;
+  discountPercent?: number;
+  totalUnitsSold?: number;
 }
 
 interface DealCancelledMessage {
@@ -42,10 +54,15 @@ type NotificationMessage =
   | DealClosedMessage 
   | DealCancelledMessage;
 
-export function useNotifications() {
+interface UseNotificationsOptions {
+  onDealClosed?: (data: DealClosedData) => void;
+}
+
+export function useNotifications(options?: UseNotificationsOptions) {
   const { toast } = useToast();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const onDealClosedRef = useRef(options?.onDealClosed);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -103,6 +120,17 @@ export function useNotifications() {
             queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
             queryClient.invalidateQueries({ queryKey: ["/api/deals", message.dealId] });
             queryClient.invalidateQueries({ queryKey: ["/api/user/purchases"] });
+            
+            if (onDealClosedRef.current) {
+              onDealClosedRef.current({
+                dealId: message.dealId,
+                dealName: message.dealName,
+                finalPrice: message.finalPrice,
+                originalPrice: message.originalPrice,
+                discountPercent: message.discountPercent,
+                totalUnitsSold: message.totalUnitsSold,
+              });
+            }
           } else if (message.type === "deal_cancelled") {
             toast({
               title: "הדיל בוטל",

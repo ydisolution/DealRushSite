@@ -1,15 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotifications, type DealClosedData } from "@/hooks/useNotifications";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import AuthModal from "@/components/AuthModal";
+import DealSuccessCelebration from "@/components/DealSuccessCelebration";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import DealPage from "@/pages/DealPage";
@@ -59,9 +60,15 @@ function AppContent() {
   const { isAuthenticated, isLoading, user, logout } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState<"login" | "register">("login");
+  const [celebrationData, setCelebrationData] = useState<DealClosedData | null>(null);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  useNotifications();
+  
+  const handleDealClosed = useCallback((data: DealClosedData) => {
+    setCelebrationData(data);
+  }, []);
+  
+  useNotifications({ onDealClosed: handleDealClosed });
   const notificationCount = isAuthenticated ? 1 : 0;
 
   useEffect(() => {
@@ -118,6 +125,16 @@ function AppContent() {
         isOpen={authModalOpen} 
         onClose={() => setAuthModalOpen(false)}
         defaultTab={authModalTab}
+      />
+      
+      <DealSuccessCelebration
+        isOpen={!!celebrationData}
+        dealName={celebrationData?.dealName || ""}
+        finalPrice={celebrationData?.finalPrice || 0}
+        originalPrice={celebrationData?.originalPrice || Math.round(celebrationData?.finalPrice ? celebrationData.finalPrice / (1 - (celebrationData.discountPercent || 0) / 100) : 0)}
+        discountPercent={celebrationData?.discountPercent || 0}
+        totalUnitsSold={celebrationData?.totalUnitsSold}
+        onClose={() => setCelebrationData(null)}
       />
     </div>
   );
