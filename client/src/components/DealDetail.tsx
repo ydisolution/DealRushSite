@@ -61,13 +61,16 @@ interface DealDetailProps {
     priceTo?: number;
     timestamp: Date;
   }>;
-  onJoin?: () => void;
+  onJoin?: (quantity: number) => void;
   onBack?: () => void;
 }
 
 export default function DealDetail({ deal, totalUnitsSold, activities, onJoin, onBack }: DealDetailProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState("description");
+  const [quantity, setQuantity] = useState(1);
+  
+  const maxQuantity = 10;
 
   const {
     name,
@@ -334,18 +337,87 @@ export default function DealDetail({ deal, totalUnitsSold, activities, onJoin, o
             </motion.div>
           )}
 
-          <div className="flex justify-center mb-6">
-            <Button 
-              size="lg" 
-              className="gap-2 text-lg px-10 py-6 shadow-lg shadow-primary/25 hover:shadow-xl"
-              onClick={onJoin}
-              data-testid="button-join-deal"
-            >
-              <ShoppingCart className="h-5 w-5" />
-              הצטרפו לדיל
-              {savings > 0 && ` - חסכו ₪${savings.toLocaleString()}`}
-            </Button>
-          </div>
+          <Card className="mb-6">
+            <CardContent className="p-4 md:p-6">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground mb-1">כמות יחידות</p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        disabled={quantity <= 1}
+                        data-testid="button-decrease-quantity"
+                      >
+                        <span className="text-lg font-bold">-</span>
+                      </Button>
+                      <span className="text-2xl font-bold min-w-[3rem] text-center" data-testid="text-quantity">
+                        {quantity}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setQuantity(Math.min(maxQuantity, quantity + 1))}
+                        disabled={quantity >= maxQuantity}
+                        data-testid="button-increase-quantity"
+                      >
+                        <span className="text-lg font-bold">+</span>
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="h-12 w-px bg-border hidden md:block" />
+                  
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground mb-1">סה"כ לתשלום</p>
+                    <div className="flex items-center gap-2">
+                      {savings > 0 && (
+                        <span className="text-sm text-muted-foreground line-through">
+                          ₪{(originalPrice * quantity).toLocaleString()}
+                        </span>
+                      )}
+                      <span className="text-2xl font-bold text-primary" data-testid="text-total-price">
+                        ₪{(effectivePrice * quantity).toLocaleString()}
+                      </span>
+                    </div>
+                    {quantity > 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        ₪{effectivePrice.toLocaleString()} ליחידה
+                      </p>
+                    )}
+                  </div>
+                </div>
+                
+                <Button 
+                  size="lg" 
+                  className="gap-2 text-lg px-8 py-6 shadow-lg shadow-primary/25 hover:shadow-xl w-full md:w-auto"
+                  onClick={() => onJoin?.(quantity)}
+                  data-testid="button-join-deal"
+                >
+                  <ShoppingCart className="h-5 w-5" />
+                  הצטרפו לדיל
+                  {savings > 0 && ` - חסכו ₪${(savings * quantity).toLocaleString()}`}
+                </Button>
+              </div>
+              
+              {quantity > 1 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="mt-4 pt-4 border-t"
+                >
+                  <div className="flex items-center justify-center gap-2 text-success">
+                    <Check className="h-4 w-4" />
+                    <span className="text-sm font-medium">
+                      כל {quantity} היחידות יחויבו במחיר הסופי הנמוך ביותר!
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+            </CardContent>
+          </Card>
 
           <div className="flex items-center justify-center gap-3 p-3 rounded-lg bg-muted/50 mb-6">
             <div className="flex items-center gap-2">

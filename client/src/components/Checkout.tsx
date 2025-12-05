@@ -447,7 +447,11 @@ export default function Checkout({ deal, onBack, onComplete }: CheckoutProps) {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [position, setPosition] = useState<number | null>(null);
   const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialQuantity = parseInt(urlParams.get('quantity') || '1', 10);
+  const [quantity, setQuantity] = useState(Math.min(Math.max(1, initialQuantity), 10));
+  
   const { toast } = useToast();
   
   const [shippingInfo, setShippingInfo] = useState({

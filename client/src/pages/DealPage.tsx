@@ -101,9 +101,9 @@ export default function DealPage({ onOpenAuth }: DealPageProps) {
     { id: "5", type: "join" as const, userName: "אבי ל.", timestamp: new Date(Date.now() - 20 * 60 * 1000) },
   ];
 
-  const handleJoinDeal = () => {
+  const handleJoinDeal = (quantity: number = 1) => {
     if (isAuthenticated) {
-      setLocation(`/checkout/${id}`);
+      setLocation(`/checkout/${id}?quantity=${quantity}`);
     } else {
       onOpenAuth?.();
     }
