@@ -302,6 +302,7 @@ export async function registerRoutes(
         phone: user.phone,
         isEmailVerified: user.isEmailVerified,
         isAdmin: user.isAdmin,
+        isSupplier: user.isSupplier,
         profileImageUrl: user.profileImageUrl,
         createdAt: user.createdAt,
       });
@@ -1450,6 +1451,56 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error rejecting deal:", error);
       res.status(500).json({ error: "Failed to reject deal" });
+    }
+  });
+
+  app.get("/api/supplier/settings", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user || user.isSupplier !== "true") {
+        return res.status(403).json({ error: "Not a supplier" });
+      }
+      
+      res.json({
+        companyName: user.supplierCompanyName || "",
+        bankDetails: user.supplierBankDetails || "",
+        stripeAccountId: user.supplierStripeAccountId || "",
+      });
+    } catch (error) {
+      console.error("Error fetching supplier settings:", error);
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  app.post("/api/supplier/settings", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user || user.isSupplier !== "true") {
+        return res.status(403).json({ error: "Not a supplier" });
+      }
+      
+      const { companyName, bankDetails, stripeAccountId } = req.body;
+      
+      await storage.updateUser(userId, {
+        supplierCompanyName: companyName || null,
+        supplierBankDetails: bankDetails || null,
+        supplierStripeAccountId: stripeAccountId || null,
+      });
+      
+      res.json({ message: "Settings updated successfully" });
+    } catch (error) {
+      console.error("Error updating supplier settings:", error);
+      res.status(500).json({ error: "Failed to update settings" });
     }
   });
 

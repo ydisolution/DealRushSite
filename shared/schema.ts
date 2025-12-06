@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   isSupplier: text("is_supplier").default("false"),
   supplierCompanyName: text("supplier_company_name"),
   supplierBankDetails: text("supplier_bank_details"),
+  supplierStripeAccountId: text("supplier_stripe_account_id"),
   isEmailVerified: text("is_email_verified").default("false"),
   emailVerificationToken: text("email_verification_token"),
   emailVerificationExpires: timestamp("email_verification_expires"),

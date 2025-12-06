@@ -22,6 +22,7 @@ import ClosingTodayPage from "@/pages/ClosingTodayPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import SupplierDashboard from "@/pages/SupplierDashboard";
+import SupplierSettings from "@/pages/SupplierSettings";
 
 function Router({ onOpenAuth }: { onOpenAuth: () => void }) {
   const { isAuthenticated, isLoading, logout } = useAuth();
@@ -52,6 +53,12 @@ function Router({ onOpenAuth }: { onOpenAuth: () => void }) {
       <Route path="/admin" component={AdminPage} />
       <Route path="/supplier">
         {isAuthenticated ? <SupplierDashboard /> : <Home onOpenAuth={onOpenAuth} />}
+      </Route>
+      <Route path="/supplier-dashboard">
+        {isAuthenticated ? <SupplierDashboard /> : <Home onOpenAuth={onOpenAuth} />}
+      </Route>
+      <Route path="/supplier-settings">
+        {isAuthenticated ? <SupplierSettings /> : <Home onOpenAuth={onOpenAuth} />}
       </Route>
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />

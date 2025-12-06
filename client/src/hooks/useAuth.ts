@@ -9,6 +9,7 @@ interface User {
   phone: string | null;
   isEmailVerified: string;
   isAdmin: string | null;
+  isSupplier: string | null;
   profileImageUrl: string | null;
   createdAt: string;
 }

@@ -19,7 +19,8 @@ import {
   Plus,
   BarChart3,
   FileText,
-  Send
+  Send,
+  Settings
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -134,12 +135,19 @@ export default function SupplierDashboard() {
             <h1 className="text-3xl font-bold">דשבורד ספק</h1>
             <p className="text-muted-foreground mt-1">נהל את הדילים שלך וצפה בסטטיסטיקות</p>
           </div>
-          <Link href="/supplier/deals/new">
-            <Button data-testid="button-create-deal">
-              <Plus className="h-4 w-4 ml-2" />
-              צור דיל חדש
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/supplier-settings">
+              <Button variant="outline" size="icon" data-testid="button-supplier-settings" title="הגדרות ספק">
+                <Settings className="h-5 w-5" />
+              </Button>
+            </Link>
+            <Link href="/supplier/deals/new">
+              <Button data-testid="button-create-deal">
+                <Plus className="h-4 w-4 ml-2" />
+                צור דיל חדש
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
