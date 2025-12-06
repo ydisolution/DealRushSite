@@ -173,6 +173,8 @@ router.post("/deals", isAuthenticated, isSupplier, async (req: Request, res: Res
       status: DealStatus.DRAFT,
       supplierId,
       supplierName: user?.supplierCompanyName || `${user?.firstName} ${user?.lastName}`,
+      supplierStripeKey: user?.supplierStripeAccountId || null,
+      supplierBankAccount: user?.supplierBankDetails || null,
       platformCommission: 5,
     });
     
