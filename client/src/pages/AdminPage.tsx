@@ -663,6 +663,296 @@ function DealForm({
   );
 }
 
+interface SupplierDeal extends Deal {
+  supplierEmail?: string;
+  supplierFirstName?: string;
+  supplierLastName?: string;
+}
+
+interface SupplierWithDeals {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  supplierCompanyName: string | null;
+  deals: Deal[];
+}
+
+function SupplierManagement() {
+  const { toast } = useToast();
+  const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null);
+
+  const { data: pendingDeals = [], isLoading: loadingPending } = useQuery<SupplierDeal[]>({
+    queryKey: ["/api/admin/pending-deals"],
+  });
+
+  const { data: suppliers = [], isLoading: loadingSuppliers } = useQuery<SupplierWithDeals[]>({
+    queryKey: ["/api/admin/suppliers-with-deals"],
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async (dealId: string) => {
+      const response = await apiRequest("POST", `/api/admin/deals/${dealId}/approve`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/suppliers-with-deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      toast({
+        title: "הדיל אושר בהצלחה",
+        description: "הדיל עכשיו מוצג לגולשים במרקט",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "שגיאה באישור הדיל",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async (dealId: string) => {
+      const response = await apiRequest("POST", `/api/admin/deals/${dealId}/reject`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/suppliers-with-deals"] });
+      toast({
+        title: "הדיל נדחה",
+        description: "הספק יקבל הודעה על הדחייה",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "שגיאה בדחיית הדיל",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(price);
+  };
+
+  if (loadingPending || loadingSuppliers) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => (
+          <Card key={i} className="animate-pulse">
+            <CardContent className="p-4">
+              <div className="h-5 bg-muted rounded w-1/3 mb-2" />
+              <div className="h-4 bg-muted rounded w-1/2" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-warning/10">
+                <Clock className="h-6 w-6 text-warning" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">דילים ממתינים לאישור</p>
+                <p className="text-2xl font-bold">{pendingDeals.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-primary/10">
+                <Store className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">סה"כ ספקים</p>
+                <p className="text-2xl font-bold">{suppliers.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-success/10">
+                <CheckCircle className="h-6 w-6 text-success" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">דילים פעילים מספקים</p>
+                <p className="text-2xl font-bold">
+                  {suppliers.reduce((sum, s) => sum + s.deals.filter(d => d.status === "active").length, 0)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div>
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <AlertCircle className="h-5 w-5 text-warning" />
+          דילים ממתינים לאישור ({pendingDeals.length})
+        </h2>
+        {pendingDeals.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <CheckCircle className="h-12 w-12 mx-auto mb-4 text-success" />
+              <p>אין דילים ממתינים לאישור</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {pendingDeals.map((deal) => (
+              <Card key={deal.id} className="border-warning/50">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-lg">{deal.name}</CardTitle>
+                      <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                        <Store className="h-4 w-4" />
+                        <span>{deal.supplierName || "ספק לא ידוע"}</span>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="bg-warning/10 text-warning border-warning">
+                      ממתין לאישור
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {deal.images?.[0] && (
+                    <img 
+                      src={deal.images[0]} 
+                      alt={deal.name}
+                      className="w-full h-32 object-cover rounded-md"
+                    />
+                  )}
+                  <p className="text-sm text-muted-foreground line-clamp-2">{deal.description}</p>
+                  <div className="flex items-center justify-between text-sm">
+                    <span>מחיר מקורי: {formatPrice(deal.originalPrice)}</span>
+                    <span>יעד: {deal.targetParticipants} משתתפים</span>
+                  </div>
+                  <Separator />
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 gap-1.5"
+                      onClick={() => approveMutation.mutate(deal.id)}
+                      disabled={approveMutation.isPending || rejectMutation.isPending}
+                      data-testid={`button-approve-deal-${deal.id}`}
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      אשר דיל
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-1.5 text-destructive hover:text-destructive"
+                      onClick={() => rejectMutation.mutate(deal.id)}
+                      disabled={approveMutation.isPending || rejectMutation.isPending}
+                      data-testid={`button-reject-deal-${deal.id}`}
+                    >
+                      <XCircle className="h-4 w-4" />
+                      דחה
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
+      <div>
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Store className="h-5 w-5" />
+          כל הספקים ({suppliers.length})
+        </h2>
+        {suppliers.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <Store className="h-12 w-12 mx-auto mb-4" />
+              <p>אין ספקים רשומים במערכת</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {suppliers.map((supplier) => (
+              <Card key={supplier.id}>
+                <CardHeader className="cursor-pointer" onClick={() => setExpandedSupplier(expandedSupplier === supplier.id ? null : supplier.id)}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <Store className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">
+                          {supplier.supplierCompanyName || `${supplier.firstName} ${supplier.lastName}`}
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">{supplier.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant="secondary">
+                        {supplier.deals.length} דילים
+                      </Badge>
+                      {expandedSupplier === supplier.id ? (
+                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                {expandedSupplier === supplier.id && supplier.deals.length > 0 && (
+                  <CardContent>
+                    <div className="space-y-2">
+                      {supplier.deals.map((deal) => (
+                        <div key={deal.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            {deal.images?.[0] && (
+                              <img src={deal.images[0]} alt="" className="w-12 h-12 object-cover rounded" />
+                            )}
+                            <div>
+                              <p className="font-medium">{deal.name}</p>
+                              <p className="text-sm text-muted-foreground">{formatPrice(deal.originalPrice)}</p>
+                            </div>
+                          </div>
+                          <Badge
+                            variant={deal.status === "active" ? "default" : deal.status === "pending" ? "outline" : "secondary"}
+                            className={
+                              deal.status === "active" ? "bg-success text-white" : 
+                              deal.status === "pending" ? "bg-warning/10 text-warning border-warning" : ""
+                            }
+                          >
+                            {deal.status === "active" ? "פעיל" : 
+                             deal.status === "pending" ? "ממתין" : 
+                             deal.status === "rejected" ? "נדחה" :
+                             deal.status === "closed" ? "נסגר" : deal.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function UsersManagement() {
   const { toast } = useToast();
   
@@ -1499,10 +1789,14 @@ function AdminContentPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        <TabsList className="grid w-full max-w-3xl grid-cols-5">
           <TabsTrigger value="deals" className="gap-2" data-testid="tab-deals">
             <Package className="h-4 w-4" />
             ניהול דילים
+          </TabsTrigger>
+          <TabsTrigger value="suppliers" className="gap-2" data-testid="tab-suppliers">
+            <Store className="h-4 w-4" />
+            ניהול ספקים
           </TabsTrigger>
           <TabsTrigger value="closed" className="gap-2" data-testid="tab-closed">
             <CheckCircle className="h-4 w-4" />
@@ -1724,6 +2018,10 @@ function AdminContentPage() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="suppliers">
+          <SupplierManagement />
         </TabsContent>
 
         <TabsContent value="closed">

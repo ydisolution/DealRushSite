@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowRight, Plus, Trash2, Save, Send } from "lucide-react";
+import { ArrowRight, Plus, Trash2, Send } from "lucide-react";
 import { Link } from "wouter";
 
 const tierSchema = z.object({
@@ -94,8 +94,8 @@ export default function SupplierCreateDeal() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers/deals"] });
       toast({
-        title: "הדיל נוצר בהצלחה",
-        description: "הדיל נשמר כטיוטה. תוכל לשלוח אותו לאישור מאוחר יותר.",
+        title: "הדיל נשלח לאישור",
+        description: "הדיל נשלח בהצלחה ומחכה לאישור מנהל. תקבל עדכון כשהדיל יאושר.",
       });
       setLocation("/supplier");
     },
@@ -483,11 +483,11 @@ export default function SupplierCreateDeal() {
                 data-testid="button-save-deal"
               >
                 {createMutation.isPending ? (
-                  "שומר..."
+                  "שולח לאישור..."
                 ) : (
                   <>
-                    <Save className="h-4 w-4 ml-2" />
-                    שמור כטיוטה
+                    <Send className="h-4 w-4 ml-2" />
+                    שלח לאישור
                   </>
                 )}
               </Button>

@@ -170,7 +170,7 @@ router.post("/deals", isAuthenticated, isSupplier, async (req: Request, res: Res
       tiers: data.tiers,
       specs: data.specs || [],
       isActive: "false",
-      status: DealStatus.DRAFT,
+      status: DealStatus.PENDING,
       supplierId,
       supplierName: user?.supplierCompanyName || `${user?.firstName} ${user?.lastName}`,
       supplierStripeKey: user?.supplierStripeAccountId || null,

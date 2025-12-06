@@ -1338,6 +1338,28 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/suppliers-with-deals", isAdmin, async (_req: Request, res: Response) => {
+    try {
+      const allUsers = await db.select().from(users);
+      const suppliers = allUsers.filter(u => u.isSupplier === "true");
+      const allDeals = await storage.getDeals();
+      
+      const suppliersWithDeals = suppliers.map(s => ({
+        id: s.id,
+        email: s.email,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        supplierCompanyName: s.supplierCompanyName,
+        deals: allDeals.filter(d => d.supplierId === s.id),
+      }));
+      
+      res.json(suppliersWithDeals);
+    } catch (error) {
+      console.error("Error fetching suppliers with deals:", error);
+      res.status(500).json({ error: "Failed to fetch suppliers with deals" });
+    }
+  });
+
   app.post("/api/admin/users/:userId/toggle-supplier", isAdmin, async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;

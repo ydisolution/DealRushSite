@@ -19,15 +19,15 @@ export default function Home({ onOpenAuth }: HomeProps) {
   const { isAuthenticated } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState("");
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 3000000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000000]);
 
   const { data: deals = [], isLoading } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
   });
 
   const maxPrice = useMemo(() => {
-    if (deals.length === 0) return 3000000;
-    return Math.max(...deals.map(d => d.originalPrice));
+    if (deals.length === 0) return 10000000;
+    return Math.max(...deals.map(d => d.originalPrice), 10000000);
   }, [deals]);
 
   const heroStats = useMemo(() => {
