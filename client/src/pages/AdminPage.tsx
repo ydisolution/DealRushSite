@@ -44,7 +44,10 @@ import {
   ChevronDown,
   ChevronUp,
   XCircle,
-  Eye
+  Eye,
+  Store,
+  UserCheck,
+  UserX
 } from "lucide-react";
 import type { Deal } from "@shared/schema";
 import { CATEGORIES } from "@shared/schema";
@@ -78,6 +81,17 @@ interface AnalyticsData {
     revenue: number;
   }>;
   range: string;
+}
+
+interface AdminUser {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  isAdmin: string | null;
+  isSupplier: string | null;
+  supplierCompanyName: string | null;
+  createdAt: Date | null;
 }
 
 const tierSchema = z.object({
@@ -646,6 +660,189 @@ function DealForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+function UsersManagement() {
+  const { toast } = useToast();
+  
+  const { data: users = [], isLoading } = useQuery<AdminUser[]>({
+    queryKey: ["/api/admin/users"],
+  });
+
+  const toggleSupplierMutation = useMutation({
+    mutationFn: async ({ userId }: { userId: string }) => {
+      const response = await apiRequest("POST", `/api/admin/users/${userId}/toggle-supplier`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: data.isSupplier ? "המשתמש הפך לספק" : "הרשאות הספק הוסרו",
+        description: data.message,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "שגיאה",
+        description: "לא ניתן לעדכן את המשתמש",
+        variant: "destructive",
+      });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => (
+          <Card key={i} className="animate-pulse">
+            <CardContent className="p-4">
+              <div className="h-5 bg-muted rounded w-1/3 mb-2" />
+              <div className="h-4 bg-muted rounded w-1/2" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  const suppliers = users.filter(u => u.isSupplier === "true");
+  const regularUsers = users.filter(u => u.isSupplier !== "true" && u.isAdmin !== "true");
+  const admins = users.filter(u => u.isAdmin === "true");
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-primary/10">
+                <Users className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">סה"כ משתמשים</p>
+                <p className="text-2xl font-bold">{users.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-success/10">
+                <Store className="h-6 w-6 text-success" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">ספקים</p>
+                <p className="text-2xl font-bold">{suppliers.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-accent/30">
+                <UserCheck className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">מנהלים</p>
+                <p className="text-2xl font-bold">{admins.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Store className="h-5 w-5" />
+            ספקים ({suppliers.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {suppliers.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">אין ספקים רשומים</p>
+          ) : (
+            <div className="space-y-3">
+              {suppliers.map(user => (
+                <div key={user.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg" data-testid={`supplier-row-${user.id}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center">
+                      <Store className="h-5 w-5 text-success" />
+                    </div>
+                    <div>
+                      <p className="font-medium">
+                        {user.firstName || ""} {user.lastName || ""} 
+                        {(!user.firstName && !user.lastName) && user.email}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{user.email}</p>
+                      {user.supplierCompanyName && (
+                        <Badge variant="outline" className="mt-1">{user.supplierCompanyName}</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => toggleSupplierMutation.mutate({ userId: user.id })}
+                    disabled={toggleSupplierMutation.isPending}
+                    data-testid={`button-remove-supplier-${user.id}`}
+                  >
+                    <UserX className="h-4 w-4 ml-1" />
+                    הסר הרשאת ספק
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            משתמשים רגילים ({regularUsers.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {regularUsers.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">אין משתמשים רגילים</p>
+          ) : (
+            <div className="space-y-3">
+              {regularUsers.map(user => (
+                <div key={user.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg" data-testid={`user-row-${user.id}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">
+                        {user.firstName || ""} {user.lastName || ""} 
+                        {(!user.firstName && !user.lastName) && user.email}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{user.email}</p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="default" 
+                    size="sm"
+                    onClick={() => toggleSupplierMutation.mutate({ userId: user.id })}
+                    disabled={toggleSupplierMutation.isPending}
+                    data-testid={`button-make-supplier-${user.id}`}
+                  >
+                    <Store className="h-4 w-4 ml-1" />
+                    הפוך לספק
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -1302,7 +1499,7 @@ function AdminContentPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-xl grid-cols-3">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="deals" className="gap-2" data-testid="tab-deals">
             <Package className="h-4 w-4" />
             ניהול דילים
@@ -1310,6 +1507,10 @@ function AdminContentPage() {
           <TabsTrigger value="closed" className="gap-2" data-testid="tab-closed">
             <CheckCircle className="h-4 w-4" />
             דילים סגורים
+          </TabsTrigger>
+          <TabsTrigger value="users" className="gap-2" data-testid="tab-users">
+            <Users className="h-4 w-4" />
+            משתמשים
           </TabsTrigger>
           <TabsTrigger value="analytics" className="gap-2" data-testid="tab-analytics">
             <BarChart3 className="h-4 w-4" />
@@ -1527,6 +1728,10 @@ function AdminContentPage() {
 
         <TabsContent value="closed">
           <ClosedDealsDashboard />
+        </TabsContent>
+
+        <TabsContent value="users">
+          <UsersManagement />
         </TabsContent>
 
         <TabsContent value="analytics">

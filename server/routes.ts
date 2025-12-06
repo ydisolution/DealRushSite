@@ -1300,6 +1300,25 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/users", isAdmin, async (_req: Request, res: Response) => {
+    try {
+      const allUsers = await db.select().from(users);
+      res.json(allUsers.map(u => ({
+        id: u.id,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        isAdmin: u.isAdmin,
+        isSupplier: u.isSupplier,
+        supplierCompanyName: u.supplierCompanyName,
+        createdAt: u.createdAt,
+      })));
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
   app.get("/api/admin/suppliers", isAdmin, async (_req: Request, res: Response) => {
     try {
       const allUsers = await db.select().from(users);
@@ -1315,6 +1334,33 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching suppliers:", error);
       res.status(500).json({ error: "Failed to fetch suppliers" });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/toggle-supplier", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { companyName } = req.body;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const isCurrentlySupplier = user.isSupplier === "true";
+      
+      await storage.updateUser(userId, {
+        isSupplier: isCurrentlySupplier ? null : "true",
+        supplierCompanyName: isCurrentlySupplier ? null : (companyName || user.supplierCompanyName || null),
+      });
+      
+      res.json({ 
+        message: isCurrentlySupplier ? "User is no longer a supplier" : "User is now a supplier",
+        isSupplier: !isCurrentlySupplier
+      });
+    } catch (error) {
+      console.error("Error toggling supplier status:", error);
+      res.status(500).json({ error: "Failed to update user" });
     }
   });
 
