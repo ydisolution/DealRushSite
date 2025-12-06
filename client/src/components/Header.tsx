@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Zap, Menu, User, ShoppingBag, Bell, Settings } from "lucide-react";
+import { Zap, Menu, User, ShoppingBag, Bell, Settings, Store } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -14,6 +14,7 @@ interface HeaderUser {
   phone: string | null;
   isEmailVerified: string;
   isAdmin: string | null;
+  isSupplier: string | null;
   profileImageUrl: string | null;
   createdAt: string;
 }
@@ -83,6 +84,13 @@ export default function Header({
                 <Link href="/admin">
                   <Button variant="ghost" size="icon" data-testid="button-admin" title="ניהול">
                     <Settings className="h-5 w-5" />
+                  </Button>
+                </Link>
+              )}
+              {user?.isSupplier === "true" && (
+                <Link href="/supplier-dashboard">
+                  <Button variant="ghost" size="icon" data-testid="button-supplier" title="אזור ספק">
+                    <Store className="h-5 w-5" />
                   </Button>
                 </Link>
               )}
@@ -199,6 +207,22 @@ export default function Header({
                           הדילים שלי
                         </Button>
                       </Link>
+                      {user?.isSupplier === "true" && (
+                        <Link href="/supplier-dashboard" onClick={() => setMobileMenuOpen(false)}>
+                          <Button variant="outline" className="w-full justify-start gap-2">
+                            <Store className="h-4 w-4" />
+                            אזור ספק
+                          </Button>
+                        </Link>
+                      )}
+                      {user?.isAdmin === "true" && (
+                        <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
+                          <Button variant="outline" className="w-full justify-start gap-2">
+                            <Settings className="h-4 w-4" />
+                            ניהול
+                          </Button>
+                        </Link>
+                      )}
                       <Button 
                         variant="ghost" 
                         className="w-full justify-start"
