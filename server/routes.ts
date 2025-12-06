@@ -1297,5 +1297,112 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/suppliers", isAdmin, async (_req: Request, res: Response) => {
+    try {
+      const allUsers = await db.select().from(users);
+      const suppliers = allUsers.filter(u => u.isSupplier === "true");
+      res.json(suppliers.map(s => ({
+        id: s.id,
+        email: s.email,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        companyName: s.supplierCompanyName,
+        createdAt: s.createdAt,
+      })));
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+      res.status(500).json({ error: "Failed to fetch suppliers" });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/make-supplier", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { companyName } = req.body;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      await storage.updateUser(userId, {
+        isSupplier: "true",
+        supplierCompanyName: companyName || null,
+      });
+      
+      res.json({ message: "User is now a supplier" });
+    } catch (error) {
+      console.error("Error making user supplier:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.get("/api/admin/pending-deals", isAdmin, async (_req: Request, res: Response) => {
+    try {
+      const allDeals = await storage.getDeals();
+      const pendingDeals = allDeals.filter(d => d.status === "pending");
+      res.json(pendingDeals);
+    } catch (error) {
+      console.error("Error fetching pending deals:", error);
+      res.status(500).json({ error: "Failed to fetch pending deals" });
+    }
+  });
+
+  app.post("/api/admin/deals/:dealId/approve", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { dealId } = req.params;
+      const deal = await storage.getDeal(dealId);
+      
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      if (deal.status !== "pending") {
+        return res.status(400).json({ error: "Can only approve pending deals" });
+      }
+      
+      const updatedDeal = await storage.updateDeal(dealId, {
+        status: "active",
+        isActive: "true",
+        approvedAt: new Date(),
+      });
+      
+      if (updatedDeal) {
+        dealClosureService.scheduleDealClosure(updatedDeal);
+      }
+      
+      res.json(updatedDeal);
+    } catch (error) {
+      console.error("Error approving deal:", error);
+      res.status(500).json({ error: "Failed to approve deal" });
+    }
+  });
+
+  app.post("/api/admin/deals/:dealId/reject", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { dealId } = req.params;
+      const { reason } = req.body;
+      
+      const deal = await storage.getDeal(dealId);
+      
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+      
+      if (deal.status !== "pending") {
+        return res.status(400).json({ error: "Can only reject pending deals" });
+      }
+      
+      const updatedDeal = await storage.updateDeal(dealId, {
+        status: "draft",
+      });
+      
+      res.json({ message: "Deal rejected and returned to draft", deal: updatedDeal });
+    } catch (error) {
+      console.error("Error rejecting deal:", error);
+      res.status(500).json({ error: "Failed to reject deal" });
+    }
+  });
+
   return httpServer;
 }
