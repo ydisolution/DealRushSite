@@ -16,7 +16,7 @@ import MemoryStore from "memorystore";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { dealClosureService } from "./dealClosureService";
-import { setupSocialAuth, createAdminUser } from "./socialAuth";
+import { setupSocialAuth, createAdminUser, createSupplierUser } from "./socialAuth";
 import { db } from "./db";
 
 function parseIsraelTimeToUTC(dateTimeLocalString: string): Date {
@@ -149,6 +149,9 @@ export async function registerRoutes(
   
   // Create admin user on startup
   await createAdminUser();
+  
+  // Create supplier user 'Dreamer' on startup
+  await createSupplierUser();
   
   app.use("/uploads", (req, res, next) => {
     const filePath = path.join(uploadDir, req.path);

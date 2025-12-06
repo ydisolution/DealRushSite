@@ -241,3 +241,36 @@ export async function createAdminUser() {
   
   return admin;
 }
+
+export async function createSupplierUser() {
+  const supplierEmail = "dreamer@dealrush.co.il";
+  const supplierPassword = "Aa123456!";
+  
+  const passwordHash = await hashPassword(supplierPassword);
+  
+  const existingSupplier = await storage.getUserByEmail(supplierEmail);
+  if (existingSupplier) {
+    await storage.updateUser(existingSupplier.id, {
+      passwordHash,
+      isSupplier: "true",
+      isEmailVerified: "true",
+      supplierCompanyName: "Dreamer Supplies",
+    });
+    console.log("Supplier user 'Dreamer' password updated:", supplierEmail);
+    return existingSupplier;
+  }
+  
+  const supplier = await storage.upsertUser({
+    email: supplierEmail,
+    passwordHash,
+    firstName: "Dreamer",
+    lastName: "Supplier",
+    isSupplier: "true",
+    isEmailVerified: "true",
+    supplierCompanyName: "Dreamer Supplies",
+  });
+  
+  console.log("Supplier user 'Dreamer' created:", supplierEmail);
+  
+  return supplier;
+}
