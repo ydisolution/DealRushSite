@@ -10,6 +10,7 @@ import path from "path";
 import fs from "fs";
 import { notificationService } from "./websocket";
 import { sendDealJoinNotification, sendPriceDropNotification, sendDealClosedNotification, sendEmail } from "./email";
+import supplierRoutes from "./supplierRoutes";
 import { registerUser, loginUser, verifyEmailByUserId, requestPasswordReset, resetPassword, resendVerificationEmail } from "./auth";
 import MemoryStore from "memorystore";
 import { stripeService } from "./stripeService";
@@ -157,6 +158,9 @@ export async function registerRoutes(
       next();
     }
   });
+
+  // Supplier routes
+  app.use("/api/suppliers", supplierRoutes);
 
   const registerSchema = z.object({
     email: z.string().email("כתובת מייל לא תקינה"),

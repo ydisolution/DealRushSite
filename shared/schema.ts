@@ -22,6 +22,9 @@ export const users = pgTable("users", {
   phone: varchar("phone"),
   profileImageUrl: varchar("profile_image_url"),
   isAdmin: text("is_admin").default("false"),
+  isSupplier: text("is_supplier").default("false"),
+  supplierCompanyName: text("supplier_company_name"),
+  supplierBankDetails: text("supplier_bank_details"),
   isEmailVerified: text("is_email_verified").default("false"),
   emailVerificationToken: text("email_verification_token"),
   emailVerificationExpires: timestamp("email_verification_expires"),
@@ -61,6 +64,18 @@ export const tierSchema = z.object({
 
 export type Tier = z.infer<typeof tierSchema>;
 
+export const DealStatus = {
+  DRAFT: "draft",
+  PENDING: "pending",
+  APPROVED: "approved",
+  ACTIVE: "active",
+  LIVE: "live",
+  CLOSED: "closed",
+  CANCELLED: "cancelled",
+} as const;
+
+export type DealStatusType = typeof DealStatus[keyof typeof DealStatus];
+
 export const deals = pgTable("deals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -69,6 +84,7 @@ export const deals = pgTable("deals", {
   images: text("images").array().notNull().default(sql`ARRAY[]::text[]`),
   originalPrice: integer("original_price").notNull(),
   currentPrice: integer("current_price").notNull(),
+  costPrice: integer("cost_price"),
   participants: integer("participants").notNull().default(0),
   targetParticipants: integer("target_participants").notNull(),
   minParticipants: integer("min_participants").default(1),
@@ -79,6 +95,8 @@ export const deals = pgTable("deals", {
   status: text("status").default("active"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   closedAt: timestamp("closed_at"),
+  approvedAt: timestamp("approved_at"),
+  supplierId: varchar("supplier_id"),
   supplierName: text("supplier_name"),
   supplierStripeKey: text("supplier_stripe_key"),
   supplierBankAccount: text("supplier_bank_account"),
