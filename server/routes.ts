@@ -571,7 +571,9 @@ export async function registerRoutes(
   app.get("/api/deals", async (_req: Request, res: Response) => {
     try {
       const deals = await storage.getDeals();
-      res.json(deals);
+      // Only return active deals for the public marketplace
+      const activeDeals = deals.filter(d => d.status === "active");
+      res.json(activeDeals);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch deals" });
     }
@@ -592,7 +594,9 @@ export async function registerRoutes(
   app.get("/api/deals/category/:category", async (req: Request, res: Response) => {
     try {
       const deals = await storage.getDealsByCategory(req.params.category);
-      res.json(deals);
+      // Only return active deals for the public marketplace
+      const activeDeals = deals.filter(d => d.status === "active");
+      res.json(activeDeals);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch deals" });
     }
