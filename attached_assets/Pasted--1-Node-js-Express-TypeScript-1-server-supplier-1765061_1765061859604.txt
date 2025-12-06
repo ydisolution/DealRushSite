@@ -1,0 +1,573 @@
+חלק 1 – צד שרת (Node.js + Express + TypeScript)
+📁 1. צור קובץ חדש לראוטים של ספקים
+
+server/supplierRoutes.ts (או באותה תיקייה של routes.ts)
+
+// server/supplierRoutes.ts
+import { Router, Request, Response } from "express";
+
+const router = Router();
+
+/**
+ * טיפ: בשלב ראשון נשתמש במבנה בזיכרון (in-memory).
+ * אחר כך אפשר להחליף לדאטאבייס.
+ */
+
+type DealStatus = "draft" | "pending" | "approved" | "live" | "closed";
+
+interface DealTier {
+  tierNumber: number;
+  minUnits: number;     // כמה יחידות מכאן ומעלה
+  maxUnits?: number;    // עד כמה יחידות (לא חובה אם זה הטיר האחרון)
+  unitPrice: number;    // מחיר ליחידה בטיר הזה
+}
+
+interface DealCustomer {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  shippingAddress: string;
+  unitsPurchased: number;
+  unitPricePaid: number;
+  purchasedAt: string; // ISO date
+}
+
+interface SupplierDeal {
+  id: string;
+  supplierId: string;    // מזהה ספק (כרגע אפשר לשים ערך קבוע לדוגמה)
+  title: string;
+  description: string;
+  status: DealStatus;
+  regularPrice: number;
+  costPrice: number;
+  tiers: DealTier[];
+  createdAt: string;
+  approvedAt?: string;
+  closedAt?: string;
+  // נתונים מחושבים/מצטברים
+  customers: DealCustomer[];
+  commissionRate: number; // אחוז עמלה לפלטפורמה לדוגמה 0.1 = 10%
+}
+
+// מאגר זמני בזיכרון
+const deals: SupplierDeal[] = [];
+
+// פונקציה שתביא supplierId מה־auth שלך (כרגע דמיוני)
+function getSupplierIdFromReq(req: Request): string {
+  // TODO: להחליף לקריאה אמיתית מה־JWT / session
+  return "demo-supplier-1";
+}
+
+// פונקציה שמחזירה נתונים מצטברים לדיל
+function getDealAggregates(deal: SupplierDeal) {
+  const totalUnits = deal.customers.reduce(
+    (sum, c) => sum + c.unitsPurchased,
+    0
+  );
+  const grossRevenue = deal.customers.reduce(
+    (sum, c) => sum + c.unitsPurchased * c.unitPricePaid,
+    0
+  );
+  const commission = grossRevenue * deal.commissionRate;
+  const netRevenue = grossRevenue - commission;
+
+  const avgUnitPrice =
+    totalUnits > 0 ? grossRevenue / totalUnits : 0;
+
+  return {
+    totalUnits,
+    grossRevenue,
+    commission,
+    netRevenue,
+    avgUnitPrice,
+  };
+}
+
+/**
+ * POST /api/suppliers/deals
+ * יצירת דיל חדש (טיוטה)
+ */
+router.post("/deals", (req: Request, res: Response) => {
+  const supplierId = getSupplierIdFromReq(req);
+  const {
+    title,
+    description,
+    regularPrice,
+    costPrice,
+    tiers,
+    commissionRate,
+  } = req.body;
+
+  if (!title || !regularPrice || !costPrice) {
+    return res.status(400).json({ message: "חסרים שדות חובה" });
+  }
+
+  const id = "deal_" + Date.now();
+  const now = new Date().toISOString();
+
+  const newDeal: SupplierDeal = {
+    id,
+    supplierId,
+    title,
+    description: description || "",
+    status: "draft",
+    regularPrice: Number(regularPrice),
+    costPrice: Number(costPrice),
+    tiers: tiers || [],
+    commissionRate: commissionRate ?? 0.1, // 10% ברירת מחדל
+    createdAt: now,
+    customers: [],
+  };
+
+  deals.push(newDeal);
+
+  return res.status(201).json(newDeal);
+});
+
+/**
+ * POST /api/suppliers/deals/:id/submit
+ * שליחת דיל לאישור הנהלת הפלטפורמה
+ */
+router.post("/deals/:id/submit", (req: Request, res: Response) => {
+  const supplierId = getSupplierIdFromReq(req);
+  const { id } = req.params;
+
+  const deal = deals.find(
+    (d) => d.id === id && d.supplierId === supplierId
+  );
+
+  if (!deal) {
+    return res.status(404).json({ message: "דיל לא נמצא" });
+  }
+
+  if (deal.status !== "draft") {
+    return res
+      .status(400)
+      .json({ message: "אפשר לשלוח לאישור רק דיל בסטטוס טיוטה" });
+  }
+
+  deal.status = "pending";
+  return res.json(deal);
+});
+
+/**
+ * (להנהלה – לא לספק, אבל טוב שיהיה)
+ * POST /api/admin/deals/:id/approve
+ * מאשר דיל – מדמה פעולה של אדמין
+ */
+router.post("/admin/deals/:id/approve", (req: Request, res: Response) => {
+  const { id } = req.params;
+  const deal = deals.find((d) => d.id === id);
+
+  if (!deal) {
+    return res.status(404).json({ message: "דיל לא נמצא" });
+  }
+
+  deal.status = "approved";
+  deal.approvedAt = new Date().toISOString();
+
+  // ניתן גם להעביר ל-live אוטומטית:
+  deal.status = "live";
+
+  return res.json(deal);
+});
+
+/**
+ * GET /api/suppliers/deals
+ * רשימת דילים של הספק + נתונים מצטברים
+ */
+router.get("/deals", (req: Request, res: Response) => {
+  const supplierId = getSupplierIdFromReq(req);
+
+  const supplierDeals = deals
+    .filter((d) => d.supplierId === supplierId)
+    .map((d) => ({
+      ...d,
+      aggregates: getDealAggregates(d),
+    }));
+
+  return res.json(supplierDeals);
+});
+
+/**
+ * GET /api/suppliers/deals/:id
+ * פרטי דיל כולל רשימת לקוחות
+ */
+router.get("/deals/:id", (req: Request, res: Response) => {
+  const supplierId = getSupplierIdFromReq(req);
+  const { id } = req.params;
+
+  const deal = deals.find(
+    (d) => d.id === id && d.supplierId === supplierId
+  );
+
+  if (!deal) {
+    return res.status(404).json({ message: "דיל לא נמצא" });
+  }
+
+  const aggregates = getDealAggregates(deal);
+
+  return res.json({
+    ...deal,
+    aggregates,
+  });
+});
+
+/**
+ * (אופציונלי) סימולציה של רכישה – לצורך בדיקות
+ * POST /api/fake-purchase
+ */
+router.post("/fake-purchase", (req: Request, res: Response) => {
+  const { dealId, fullName, email, phone, shippingAddress, units } =
+    req.body;
+
+  const deal = deals.find((d) => d.id === dealId);
+
+  if (!deal) {
+    return res.status(404).json({ message: "דיל לא נמצא" });
+  }
+
+  // קובעים באיזה Tier הלקוח נופל לפי כמות יחידות מצטברת
+  const currentTotalUnits = deal.customers.reduce(
+    (sum, c) => sum + c.unitsPurchased,
+    0
+  );
+  const newTotalUnits = currentTotalUnits + Number(units);
+
+  // מוצאים Tier מתאים
+  const sortedTiers = [...deal.tiers].sort(
+    (a, b) => a.minUnits - b.minUnits
+  );
+
+  let unitPrice = deal.regularPrice;
+
+  for (const tier of sortedTiers) {
+    if (
+      newTotalUnits >= tier.minUnits &&
+      (tier.maxUnits === undefined || newTotalUnits <= tier.maxUnits)
+    ) {
+      unitPrice = tier.unitPrice;
+    }
+  }
+
+  const customer: DealCustomer = {
+    id: "cust_" + Date.now(),
+    fullName,
+    email,
+    phone,
+    shippingAddress,
+    unitsPurchased: Number(units),
+    unitPricePaid: unitPrice,
+    purchasedAt: new Date().toISOString(),
+  };
+
+  deal.customers.push(customer);
+
+  return res.status(201).json({ dealId: deal.id, customer });
+});
+
+export default router;
+
+📁 2. לחבר את הראוט הזה ל־Express הראשי
+
+ב־server/routes.ts (או איפה שאתה רושם את כל הראוטים):
+
+// server/routes.ts
+import { Router } from "express";
+import supplierRoutes from "./supplierRoutes";
+
+const router = Router();
+
+// ראוטים אחרים...
+// router.use("/something", someRoutes);
+
+// ראוטים של ספקים:
+router.use("/api/suppliers", supplierRoutes);
+
+// אפשר להשאיר גם את שאר הראוטים שהיו לך
+
+export default router;
+
+
+ודא שב־server/index.ts או איפה שאתה יוצר את השרת אתה משתמש ב־routes האלה.
+
+💻 חלק 2 – צד לקוח (React – בתוך client/src)
+
+נניח שיש:
+
+client/src/App.tsx – אפליקציה ראשית
+
+client/src/pages/ – שם נוסיף דף לספק
+
+📁 1. דף דשבורד ספק – עם דילים + ניתוח נתונים
+
+צור קובץ:
+client/src/pages/SupplierDashboard.tsx
+
+// client/src/pages/SupplierDashboard.tsx
+import React, { useEffect, useState } from "react";
+
+interface DealAggregates {
+  totalUnits: number;
+  grossRevenue: number;
+  commission: number;
+  netRevenue: number;
+  avgUnitPrice: number;
+}
+
+interface Deal {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  regularPrice: number;
+  costPrice: number;
+  createdAt: string;
+  approvedAt?: string;
+  closedAt?: string;
+  commissionRate: number;
+  aggregates: DealAggregates;
+}
+
+interface DealCustomer {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  shippingAddress: string;
+  unitsPurchased: number;
+  unitPricePaid: number;
+  purchasedAt: string;
+}
+
+export default function SupplierDashboard() {
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
+  const [dealCustomers, setDealCustomers] = useState<DealCustomer[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // טעינת הדילים
+  useEffect(() => {
+    fetchDeals();
+  }, []);
+
+  async function fetchDeals() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/suppliers/deals");
+      const data = await res.json();
+      setDeals(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function openDealDetails(dealId: string) {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/suppliers/deals/${dealId}`);
+      const data = await res.json();
+      setSelectedDeal(data);
+      setDealCustomers(data.customers || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ניתוח נתונים כללי לכל הדילים
+  const totalUnitsAllDeals = deals.reduce(
+    (sum, d) => sum + d.aggregates.totalUnits,
+    0
+  );
+  const totalGrossAllDeals = deals.reduce(
+    (sum, d) => sum + d.aggregates.grossRevenue,
+    0
+  );
+  const totalCommissionAllDeals = deals.reduce(
+    (sum, d) => sum + d.aggregates.commission,
+    0
+  );
+  const totalNetAllDeals = deals.reduce(
+    (sum, d) => sum + d.aggregates.netRevenue,
+    0
+  );
+
+  return (
+    <div dir="rtl" style={{ padding: "2rem", maxWidth: 1200, margin: "0 auto" }}>
+      <h1>דשבורד ספק – Deal Rush</h1>
+
+      {loading && <p>טוען נתונים...</p>}
+
+      {/* כרטיסי סיכום */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: "1rem",
+          margin: "1.5rem 0",
+        }}
+      >
+        <div style={cardStyle}>
+          <h3>סה"כ יחידות שנמכרו</h3>
+          <p>{totalUnitsAllDeals}</p>
+        </div>
+        <div style={cardStyle}>
+          <h3>סה"כ הכנסות (ברוטו)</h3>
+          <p>{totalGrossAllDeals.toFixed(2)} ₪</p>
+        </div>
+        <div style={cardStyle}>
+          <h3>סה"כ עמלה ששולמה לפלטפורמה</h3>
+          <p>{totalCommissionAllDeals.toFixed(2)} ₪</p>
+        </div>
+        <div style={cardStyle}>
+          <h3>סה"כ הכנסות נטו</h3>
+          <p>{totalNetAllDeals.toFixed(2)} ₪</p>
+        </div>
+      </div>
+
+      {/* טבלת דילים */}
+      <h2>הדילים שלי</h2>
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            <th>שם הדיל</th>
+            <th>סטטוס</th>
+            <th>יחידות</th>
+            <th>מחיר ממוצע ליחידה</th>
+            <th>הכנסה ברוטו</th>
+            <th>עמלה</th>
+            <th>נטו</th>
+            <th>תאריך יצירה</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {deals.map((deal) => (
+            <tr key={deal.id}>
+              <td>{deal.title}</td>
+              <td>{deal.status}</td>
+              <td>{deal.aggregates.totalUnits}</td>
+              <td>{deal.aggregates.avgUnitPrice.toFixed(2)} ₪</td>
+              <td>{deal.aggregates.grossRevenue.toFixed(2)} ₪</td>
+              <td>{deal.aggregates.commission.toFixed(2)} ₪</td>
+              <td>{deal.aggregates.netRevenue.toFixed(2)} ₪</td>
+              <td>{new Date(deal.createdAt).toLocaleString("he-IL")}</td>
+              <td>
+                <button onClick={() => openDealDetails(deal.id)}>פרטים</button>
+              </td>
+            </tr>
+          ))}
+          {deals.length === 0 && !loading && (
+            <tr>
+              <td colSpan={9}>אין דילים להצגה עדיין.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      {/* פרטי דיל נבחר + לקוחות */}
+      {selectedDeal && (
+        <div style={{ marginTop: "2rem" }}>
+          <h2>פרטי דיל: {selectedDeal.title}</h2>
+          <p>{selectedDeal.description}</p>
+          <p>סטטוס: {selectedDeal.status}</p>
+          <p>
+            נוצר בתאריך:{" "}
+            {new Date(selectedDeal.createdAt).toLocaleString("he-IL")}
+          </p>
+          {selectedDeal.approvedAt && (
+            <p>
+              אושר בתאריך:{" "}
+              {new Date(selectedDeal.approvedAt).toLocaleString("he-IL")}
+            </p>
+          )}
+          {selectedDeal.closedAt && (
+            <p>
+              נסגר בתאריך:{" "}
+              {new Date(selectedDeal.closedAt).toLocaleString("he-IL")}
+            </p>
+          )}
+
+          <h3>לקוחות ורכישות</h3>
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th>שם מלא</th>
+                <th>טלפון</th>
+                <th>מייל</th>
+                <th>כתובת משלוח</th>
+                <th>כמות יחידות</th>
+                <th>מחיר ליחידה</th>
+                <th>תאריך רכישה</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dealCustomers.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.fullName}</td>
+                  <td>{c.phone}</td>
+                  <td>{c.email}</td>
+                  <td>{c.shippingAddress}</td>
+                  <td>{c.unitsPurchased}</td>
+                  <td>{c.unitPricePaid.toFixed(2)} ₪</td>
+                  <td>
+                    {new Date(c.purchasedAt).toLocaleString("he-IL")}
+                  </td>
+                </tr>
+              ))}
+              {dealCustomers.length === 0 && (
+                <tr>
+                  <td colSpan={7}>אין עדיין רכישות לדיל זה.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const cardStyle: React.CSSProperties = {
+  background: "#f4f4f5",
+  borderRadius: "8px",
+  padding: "1rem",
+  boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+};
+
+const tableStyle: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  marginTop: "1rem",
+};
+
+
+אם תרצה, נוסיף גם דף נפרד ליצירת דיל חדש עם טופס – כרגע יש דשבורד מלא.
+
+📁 2. לחבר את הדשבורד ל-App.tsx
+
+ב־client/src/App.tsx (דוגמה, תתאים למבנה שלך):
+
+// client/src/App.tsx
+import React from "react";
+import SupplierDashboard from "./pages/SupplierDashboard";
+
+function App() {
+  return (
+    <div>
+      {/* אם יש לך Router – תשבץ שם.
+         אם לא – כרגע נציג רק את דשבורד הספק. */}
+      <SupplierDashboard />
+    </div>
+  );
+}
+
+export default App;
+
+
+אם יש לך React Router – תכניס את הקומפוננטה בתוך Route ייעודי, לדוגמה /supplier.
