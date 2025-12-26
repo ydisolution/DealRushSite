@@ -10,15 +10,15 @@ import { CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 
 interface ConfirmParticipationFormProps {
   projectSlug: string;
-  projectTitle: string;
-  apartmentTypes: Array<{ type: string; count: number; startingFromPrice: number }>;
+  projectTitle?: string;
+  apartmentTypes?: Array<{ type: string; count: number; startingFromPrice: number }>;
   onSuccess?: () => void;
 }
 
 export default function RealEstateConfirmParticipation({
   projectSlug,
-  projectTitle,
-  apartmentTypes,
+  projectTitle = "",
+  apartmentTypes = [],
   onSuccess,
 }: ConfirmParticipationFormProps) {
   const [formData, setFormData] = useState({

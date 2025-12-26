@@ -9,11 +9,11 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 
 interface PreRegisterFormProps {
   projectSlug: string;
-  projectTitle: string;
+  projectTitle?: string;
   onSuccess?: () => void;
 }
 
-export default function RealEstatePreRegister({ projectSlug, projectTitle, onSuccess }: PreRegisterFormProps) {
+export default function RealEstatePreRegister({ projectSlug, projectTitle = "", onSuccess }: PreRegisterFormProps) {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",

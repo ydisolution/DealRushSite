@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useUser } from "@/hooks/use-user";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -24,7 +24,7 @@ interface RealEstateProjectManagerProps {
 }
 
 export default function RealEstateProjectManager({ projectSlug }: RealEstateProjectManagerProps) {
-  const { user } = useUser();
+  const { user } = useAuth();
 
   const { data: project, isLoading } = useQuery<any>({
     queryKey: [`/api/real-estate/projects/${projectSlug}`],
@@ -78,7 +78,7 @@ export default function RealEstateProjectManager({ projectSlug }: RealEstateProj
 
   // Determine user's funnel status
   const userStatus = myRegistration?.funnelStatus;
-  const isAdmin = user?.role === "admin" || user?.role === "supplier";
+  const isAdmin = user?.isAdmin === "1" || user?.isSupplier === "1";
 
   // Pricing data for display
   const apartmentPrices = propertyTypes?.map((pt: any) => ({
@@ -140,7 +140,12 @@ export default function RealEstateProjectManager({ projectSlug }: RealEstateProj
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left: Registration Form */}
           <div className="space-y-6">
-            {!myRegistration && <RealEstatePreRegister projectSlug={projectSlug} />}
+            {!myRegistration && (
+              <RealEstatePreRegister 
+                projectSlug={projectSlug} 
+                projectTitle={title}
+              />
+            )}
             {myRegistration && (
               <Card className="bg-green-50 border-green-200">
                 <CardContent className="p-6 text-center">
@@ -234,7 +239,11 @@ export default function RealEstateProjectManager({ projectSlug }: RealEstateProj
               )}
 
               {myRegistration && userStatus === "PRE_REGISTERED" && (
-                <RealEstateConfirmParticipation projectSlug={projectSlug} />
+                <RealEstateConfirmParticipation 
+                  projectSlug={projectSlug}
+                  projectTitle={title}
+                  apartmentTypes={propertyTypes}
+                />
               )}
 
               {myRegistration && (userStatus === "CONFIRMED" || userStatus === "WAITING_LIST") && (
