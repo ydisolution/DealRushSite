@@ -17,6 +17,7 @@ import { useState } from "react";
 import GuidedHelpBar from "@/components/GuidedHelpBar";
 import RealEstateLegalDisclaimer from "@/components/RealEstateLegalDisclaimer";
 import StageStepper from "@/components/StageStepper";
+import RealEstateProjectManager from "@/components/RealEstateProjectManager";
 
 interface PropertyType {
   type: string;
@@ -421,6 +422,11 @@ export default function ProjectDetailPage() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Real Estate Project Manager - Full Width Section */}
+        <div className="mt-8">
+          <RealEstateProjectManager projectSlug={project.slug} />
         </div>
       </div>
     </div>
