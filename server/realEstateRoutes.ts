@@ -828,4 +828,396 @@ export function registerRealEstateRoutes(app: Express) {
       res.status(500).json({ error: "שגיאה בטעינת עזרה" });
     }
   });
+
+  // ==================== NEW REAL ESTATE FLOW ====================
+
+  /**
+   * Pre-Registration (Stage 1)
+   * Any visitor can register before webinar
+   */
+  app.post("/api/real-estate/projects/:slug/pre-register", async (req: Request, res: Response) => {
+    try {
+      const { slug } = req.params;
+      const { firstName, lastName, phone, email } = req.body;
+
+      // Validate input
+      if (!firstName || !lastName || !phone || !email) {
+        return res.status(400).json({ error: "כל השדות נדרשים" });
+      }
+
+      // Get project
+      const [project] = await db
+        .select()
+        .from(realEstateProjects)
+        .where(eq(realEstateProjects.slug, slug))
+        .limit(1);
+
+      if (!project) {
+        return res.status(404).json({ error: "פרויקט לא נמצא" });
+      }
+
+      // Check if already registered
+      const [existing] = await db
+        .select()
+        .from(projectRegistrations)
+        .where(and(
+          eq(projectRegistrations.projectId, project.id),
+          eq(projectRegistrations.email, email)
+        ))
+        .limit(1);
+
+      if (existing) {
+        return res.status(400).json({ error: "כבר נרשמת לפרויקט זה" });
+      }
+
+      // Create registration
+      const [registration] = await db
+        .insert(projectRegistrations)
+        .values({
+          projectId: project.id,
+          developerId: project.developerId,
+          userId: req.session.userId,
+          fullName: `${firstName} ${lastName}`,
+          firstName: firstName,
+          lastName: lastName,
+          phone,
+          email,
+          funnelStatus: "PRE_REGISTERED",
+          earlyRegisteredAt: new Date(),
+        })
+        .returning();
+
+      // Send welcome notifications
+      const { sendWelcomeNotification } = await import("./notificationService");
+      await sendWelcomeNotification(
+        { firstName, lastName, phone, email },
+        project.title
+      );
+
+      res.json({
+        success: true,
+        registration,
+        message: "נרשמת בהצלחה! נעדכן אותך לגבי מועד המצגת.",
+      });
+    } catch (error) {
+      console.error("Error in pre-registration:", error);
+      res.status(500).json({ error: "שגיאה ביצירת הרשמה" });
+    }
+  });
+
+  /**
+   * Confirmation Window Registration (Stage 3 - FOMO)
+   * After webinar, users confirm participation and select apartment type
+   */
+  app.post("/api/real-estate/projects/:slug/confirm-participation", async (req: Request, res: Response) => {
+    try {
+      const { slug } = req.params;
+      const { firstName, lastName, phone, email, apartmentType } = req.body;
+
+      // Validate input
+      if (!firstName || !lastName || !phone || !email || !apartmentType) {
+        return res.status(400).json({ error: "כל השדות נדרשים" });
+      }
+
+      // Get project
+      const [project] = await db
+        .select()
+        .from(realEstateProjects)
+        .where(eq(realEstateProjects.slug, slug))
+        .limit(1);
+
+      if (!project) {
+        return res.status(404).json({ error: "פרויקט לא נמצא" });
+      }
+
+      // Check if confirmation window is open
+      if (project.currentStage !== "FINAL_REGISTRATION") {
+        return res.status(400).json({ error: "חלון אישור ההשתתפות לא פתוח כרגע" });
+      }
+
+      // Check capacity
+      const totalCapacity = project.totalCapacity || 0;
+      const waitingListCapacity = project.waitingListCapacity || Math.ceil(totalCapacity * 0.2);
+      const maxTotal = totalCapacity + waitingListCapacity;
+
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(projectRegistrations)
+        .where(and(
+          eq(projectRegistrations.projectId, project.id),
+          sql`${projectRegistrations.funnelStatus} IN ('CONFIRMED_PARTICIPANT', 'WAITING_LIST')`
+        ));
+
+      if (count >= maxTotal) {
+        return res.status(400).json({ error: "ההרשמה נסגרה - הושג מכסת המשתתפים" });
+      }
+
+      // Determine status and queue position
+      const isWaitingList = count >= totalCapacity;
+      const status = isWaitingList ? "WAITING_LIST" : "CONFIRMED_PARTICIPANT";
+      const queuePosition = Number(count) + 1;
+
+      // Check if user already confirmed
+      const [existing] = await db
+        .select()
+        .from(projectRegistrations)
+        .where(and(
+          eq(projectRegistrations.projectId, project.id),
+          eq(projectRegistrations.email, email)
+        ))
+        .limit(1);
+
+      let registration;
+
+      if (existing) {
+        // Update existing registration
+        [registration] = await db
+          .update(projectRegistrations)
+          .set({
+            funnelStatus: status,
+            selectedApartmentType: apartmentType,
+            queuePosition,
+            finalRegisteredAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(projectRegistrations.id, existing.id))
+          .returning();
+      } else {
+        // Create new registration
+        [registration] = await db
+          .insert(projectRegistrations)
+          .values({
+            projectId: project.id,
+            developerId: project.developerId,
+            userId: req.session.userId,
+            fullName: `${firstName} ${lastName}`,
+            firstName,
+            lastName,
+            phone,
+            email,
+            funnelStatus: status,
+            selectedApartmentType: apartmentType,
+            queuePosition,
+            finalRegisteredAt: new Date(),
+          })
+          .returning();
+      }
+
+      // Update project counts
+      await db
+        .update(realEstateProjects)
+        .set({
+          currentRegistrantCount: isWaitingList 
+            ? project.currentRegistrantCount 
+            : (project.currentRegistrantCount || 0) + 1,
+          currentWaitingListCount: isWaitingList
+            ? (project.currentWaitingListCount || 0) + 1
+            : project.currentWaitingListCount,
+          updatedAt: new Date(),
+        })
+        .where(eq(realEstateProjects.id, project.id));
+
+      res.json({
+        success: true,
+        registration,
+        queuePosition,
+        isWaitingList,
+        message: isWaitingList 
+          ? `נרשמת לרשימת המתנה. מיקום בתור: ${queuePosition}`
+          : `אישור השתתפות התקבל! מיקום בתור: ${queuePosition}`,
+      });
+    } catch (error) {
+      console.error("Error in confirmation:", error);
+      res.status(500).json({ error: "שגיאה באישור השתתפות" });
+    }
+  });
+
+  /**
+   * Get participants list (public display - initials + last 4 of phone)
+   */
+  app.get("/api/real-estate/projects/:slug/participants", async (req: Request, res: Response) => {
+    try {
+      const { slug } = req.params;
+
+      const [project] = await db
+        .select()
+        .from(realEstateProjects)
+        .where(eq(realEstateProjects.slug, slug))
+        .limit(1);
+
+      if (!project) {
+        return res.status(404).json({ error: "פרויקט לא נמצא" });
+      }
+
+      const participants = await db
+        .select({
+          id: projectRegistrations.id,
+          queuePosition: projectRegistrations.queuePosition,
+          selectedApartmentType: projectRegistrations.selectedApartmentType,
+          funnelStatus: projectRegistrations.funnelStatus,
+          firstName: projectRegistrations.firstName,
+          lastName: projectRegistrations.lastName,
+          phone: projectRegistrations.phone,
+          finalRegisteredAt: projectRegistrations.finalRegisteredAt,
+        })
+        .from(projectRegistrations)
+        .where(and(
+          eq(projectRegistrations.projectId, project.id),
+          sql`${projectRegistrations.funnelStatus} IN ('CONFIRMED_PARTICIPANT', 'WAITING_LIST')`
+        ))
+        .orderBy(projectRegistrations.queuePosition);
+
+      // Format for public display
+      const publicParticipants = participants.map(p => ({
+        queuePosition: p.queuePosition,
+        initials: `${p.firstName?.charAt(0) || ''}${p.lastName?.charAt(0) || ''}`,
+        phoneLast4: p.phone?.slice(-4) || '****',
+        apartmentType: p.selectedApartmentType,
+        status: p.funnelStatus,
+        registeredAt: p.finalRegisteredAt,
+      }));
+
+      res.json({
+        participants: publicParticipants,
+        totalConfirmed: publicParticipants.filter(p => p.status === 'CONFIRMED_PARTICIPANT').length,
+        totalWaitingList: publicParticipants.filter(p => p.status === 'WAITING_LIST').length,
+        capacity: project.totalCapacity,
+        waitingListCapacity: project.waitingListCapacity,
+      });
+    } catch (error) {
+      console.error("Error getting participants:", error);
+      res.status(500).json({ error: "שגיאה בטעינת רשימת משתתפים" });
+    }
+  });
+
+  /**
+   * Admin: Send webinar invitations
+   */
+  app.post("/api/real-estate/projects/:slug/send-webinar-invitations", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { slug } = req.params;
+      const { webinarDate, webinarLink } = req.body;
+
+      const [project] = await db
+        .select()
+        .from(realEstateProjects)
+        .where(eq(realEstateProjects.slug, slug))
+        .limit(1);
+
+      if (!project) {
+        return res.status(404).json({ error: "פרויקט לא נמצא" });
+      }
+
+      // Get all pre-registered users
+      const preRegistered = await db
+        .select()
+        .from(projectRegistrations)
+        .where(and(
+          eq(projectRegistrations.projectId, project.id),
+          eq(projectRegistrations.funnelStatus, "PRE_REGISTERED")
+        ));
+
+      // Send invitations
+      const { notificationService } = await import("./notificationService");
+      const { sendWebinarInvitation } = await import("./notificationService");
+
+      for (const reg of preRegistered) {
+        await sendWebinarInvitation(
+          {
+            firstName: reg.firstName || '',
+            lastName: reg.lastName || '',
+            email: reg.email,
+            phone: reg.phone,
+          },
+          project.title,
+          new Date(webinarDate),
+          webinarLink
+        );
+
+        // Mark as sent
+        await db
+          .update(projectRegistrations)
+          .set({
+            webinarInviteSent: "true",
+            webinarInviteSentAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(projectRegistrations.id, reg.id));
+      }
+
+      res.json({
+        success: true,
+        sent: preRegistered.length,
+        message: `נשלחו ${preRegistered.length} הזמנות`,
+      });
+    } catch (error) {
+      console.error("Error sending invitations:", error);
+      res.status(500).json({ error: "שגיאה בשליחת הזמנות" });
+    }
+  });
+
+  /**
+   * Admin: Close registration and notify all
+   */
+  app.post("/api/real-estate/projects/:slug/close-registration", isAdmin, async (req: Request, res: Response) => {
+    try {
+      const { slug } = req.params;
+
+      const [project] = await db
+        .select()
+        .from(realEstateProjects)
+        .where(eq(realEstateProjects.slug, slug))
+        .limit(1);
+
+      if (!project) {
+        return res.status(404).json({ error: "פרויקט לא נמצא" });
+      }
+
+      // Update project status
+      await db
+        .update(realEstateProjects)
+        .set({
+          currentStage: "POST_REGISTRATION",
+          status: "closed",
+          updatedAt: new Date(),
+        })
+        .where(eq(realEstateProjects.id, project.id));
+
+      // Get all confirmed participants
+      const participants = await db
+        .select()
+        .from(projectRegistrations)
+        .where(and(
+          eq(projectRegistrations.projectId, project.id),
+          sql`${projectRegistrations.funnelStatus} IN ('CONFIRMED_PARTICIPANT', 'WAITING_LIST')`
+        ));
+
+      // Send closure notifications
+      const { sendRegistrationClosureNotification } = await import("./notificationService");
+
+      for (const reg of participants) {
+        await sendRegistrationClosureNotification(
+          {
+            firstName: reg.firstName || '',
+            lastName: reg.lastName || '',
+            email: reg.email,
+            phone: reg.phone,
+          },
+          project.title,
+          reg.queuePosition || 0,
+          reg.selectedApartmentType || '',
+          reg.funnelStatus === 'WAITING_LIST'
+        );
+      }
+
+      res.json({
+        success: true,
+        notified: participants.length,
+        message: "ההרשמה נסגרה והודעות נשלחו לכל המשתתפים",
+      });
+    } catch (error) {
+      console.error("Error closing registration:", error);
+      res.status(500).json({ error: "שגיאה בסגירת ההרשמה" });
+    }
+  });
 }

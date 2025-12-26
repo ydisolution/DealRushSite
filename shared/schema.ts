@@ -507,6 +507,12 @@ export const realEstateProjects = pgTable("real_estate_projects", {
   }>>().default([]),
   expectedDeliveryDate: timestamp("expected_delivery_date"),
   
+  // Capacity Management
+  totalCapacity: integer("total_capacity").default(0), // Total apartments in group deal
+  waitingListCapacity: integer("waiting_list_capacity").default(0), // 20% of totalCapacity
+  currentRegistrantCount: integer("current_registrant_count").default(0),
+  currentWaitingListCount: integer("current_waiting_list_count").default(0),
+  
   // Stage dates for 4-stage funnel
   earlyRegistrationStart: timestamp("early_registration_start"),
   presentationEventDate: timestamp("presentation_event_date"),
@@ -518,6 +524,11 @@ export const realEstateProjects = pgTable("real_estate_projects", {
   
   marketPriceBaseline: integer("market_price_baseline").notNull(),
   status: text("status").default("open"), // comingSoon | open | paused | closed
+  
+  // Admin-only status for under-capacity scenario
+  internalStatus: text("internal_status"), // OFFER_UPDATE | null
+  updatedOfferDetails: text("updated_offer_details"), // Admin can describe updated terms
+  
   legalDisclaimer: text("legal_disclaimer"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
@@ -565,6 +576,8 @@ export const projectRegistrations = pgTable("project_registrations", {
   developerId: varchar("developer_id").notNull(),
   userId: varchar("user_id"), // if logged in
   fullName: text("full_name").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
   phone: text("phone").notNull(),
   email: text("email").notNull(),
   cityPreference: text("city_preference"),
@@ -577,9 +590,27 @@ export const projectRegistrations = pgTable("project_registrations", {
   source: text("source"), // UTM or referrer
   
   // Full funnel status
-  funnelStatus: text("funnel_status").default("EARLY_REGISTERED"), 
-  // EARLY_REGISTERED | EVENT_RSVP | EVENT_ATTENDED | FINAL_REGISTERED | 
+  funnelStatus: text("funnel_status").default("PRE_REGISTERED"), 
+  // PRE_REGISTERED | CONFIRMED_PARTICIPANT | WAITING_LIST | 
   // TRANSFERRED_TO_DEVELOPER | IN_LEGAL_PROCESS | SIGNED | DROPPED
+  
+  // Queue Management (for CONFIRMED_PARTICIPANT and WAITING_LIST)
+  queuePosition: integer("queue_position"), // FIFO position
+  selectedApartmentType: text("selected_apartment_type"), // "3", "4", "5", "6", "Penthouse"
+  
+  // Webinar/Event tracking
+  webinarInviteSent: text("webinar_invite_sent").default("false"),
+  webinarInviteSentAt: timestamp("webinar_invite_sent_at"),
+  webinarReminderSent: text("webinar_reminder_sent").default("false"),
+  webinarReminderSentAt: timestamp("webinar_reminder_sent_at"),
+  
+  // Confirmation window
+  confirmationWindowNotified: text("confirmation_window_notified").default("false"),
+  confirmationWindowNotifiedAt: timestamp("confirmation_window_notified_at"),
+  
+  // Updated offer approval (for under-capacity scenario)
+  updatedOfferApproved: text("updated_offer_approved"), // "true" | "false" | null
+  updatedOfferApprovedAt: timestamp("updated_offer_approved_at"),
   
   // Consent tracking
   consentMarketing: text("consent_marketing").default("false"),
