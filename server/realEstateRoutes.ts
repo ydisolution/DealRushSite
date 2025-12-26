@@ -1033,6 +1033,48 @@ export function registerRealEstateRoutes(app: Express) {
   });
 
   /**
+   * Get user's own registration for a project
+   */
+  app.get("/api/real-estate/projects/:slug/my-registration", async (req: Request, res: Response) => {
+    try {
+      const { slug } = req.params;
+      const userId = req.session.userId;
+
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const [project] = await db
+        .select()
+        .from(realEstateProjects)
+        .where(eq(realEstateProjects.slug, slug))
+        .limit(1);
+
+      if (!project) {
+        return res.status(404).json({ error: "פרויקט לא נמצא" });
+      }
+
+      const [registration] = await db
+        .select()
+        .from(projectRegistrations)
+        .where(and(
+          eq(projectRegistrations.projectId, project.id),
+          eq(projectRegistrations.userId, userId)
+        ))
+        .limit(1);
+
+      if (!registration) {
+        return res.json(null);
+      }
+
+      res.json(registration);
+    } catch (error) {
+      console.error("Error getting user registration:", error);
+      res.status(500).json({ error: "שגיאה בשליפת נתוני הרשמה" });
+    }
+  });
+
+  /**
    * Get participants list (public display - initials + last 4 of phone)
    */
   app.get("/api/real-estate/projects/:slug/participants", async (req: Request, res: Response) => {
