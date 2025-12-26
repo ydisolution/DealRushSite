@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -51,6 +51,8 @@ import {
 } from "lucide-react";
 import type { Deal } from "@shared/schema";
 import { CATEGORIES } from "@shared/schema";
+import CompletedDealsAnalytics from "@/components/CompletedDealsAnalytics";
+import SystemAnalytics from "@/components/SystemAnalytics";
 
 interface AnalyticsData {
   summary: {
@@ -88,6 +90,7 @@ interface AdminUser {
   email: string;
   firstName: string | null;
   lastName: string | null;
+  phone: string | null;
   isAdmin: string | null;
   isSupplier: string | null;
   supplierCompanyName: string | null;
@@ -682,6 +685,27 @@ function SupplierManagement() {
   const { toast } = useToast();
   const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null);
 
+  // WebSocket listener for new deal notifications
+  useEffect(() => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      
+      if (message.type === "deal_pending_approval") {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-deals"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/suppliers-with-deals"] });
+        toast({
+          title: "דיל חדש ממתין לאישור! 🔔",
+          description: `${message.dealName} מאת ${message.supplierName}`,
+        });
+      }
+    };
+    
+    return () => ws.close();
+  }, [toast]);
+
   const { data: pendingDeals = [], isLoading: loadingPending } = useQuery<SupplierDeal[]>({
     queryKey: ["/api/admin/pending-deals"],
   });
@@ -1068,6 +1092,7 @@ function UsersManagement() {
                         {(!user.firstName && !user.lastName) && user.email}
                       </p>
                       <p className="text-sm text-muted-foreground">{user.email}</p>
+                      {user.phone && <p className="text-sm text-muted-foreground">טלפון: {user.phone}</p>}
                       {user.supplierCompanyName && (
                         <Badge variant="outline" className="mt-1">{user.supplierCompanyName}</Badge>
                       )}
@@ -1114,6 +1139,7 @@ function UsersManagement() {
                         {(!user.firstName && !user.lastName) && user.email}
                       </p>
                       <p className="text-sm text-muted-foreground">{user.email}</p>
+                      {user.phone && <p className="text-sm text-muted-foreground">טלפון: {user.phone}</p>}
                     </div>
                   </div>
                   <Button 
@@ -1413,9 +1439,28 @@ interface ClosedDeal {
 function ClosedDealsDashboard() {
   const [expandedDeal, setExpandedDeal] = useState<string | null>(null);
   
-  const { data: closedDeals = [], isLoading } = useQuery<ClosedDeal[]>({
+  const { data: closedDeals = [], isLoading, error } = useQuery<ClosedDeal[]>({
     queryKey: ["/api/admin/closed-deals"],
   });
+
+  if (isLoading) {
+    return (
+      <Card className="p-12 text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <p className="text-muted-foreground">טוען דילים סגורים...</p>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="p-12 text-center">
+        <Package className="h-12 w-12 mx-auto text-destructive mb-4" />
+        <h3 className="text-lg font-semibold mb-2 text-destructive">שגיאה בטעינת נתונים</h3>
+        <p className="text-muted-foreground">{(error as Error).message}</p>
+      </Card>
+    );
+  }
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "—";
@@ -1714,10 +1759,13 @@ function ClosedDealsDashboard() {
                                   </Badge>
                                 </div>
                                 <div className="flex items-center gap-4">
+                                  <span className="text-xs text-muted-foreground bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                                    מחיר דינמי
+                                  </span>
                                   <span className="text-muted-foreground">
                                     {participant.discount}% הנחה
                                   </span>
-                                  <span className="font-semibold">
+                                  <span className="font-semibold text-[#7B2FF7]">
                                     ₪{(participant.chargedAmount || participant.pricePaid).toLocaleString()}
                                   </span>
                                 </div>
@@ -1788,8 +1836,8 @@ function AdminContentPage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-3xl grid-cols-5">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6" dir="rtl">
+        <TabsList className="grid w-full max-w-3xl grid-cols-5" dir="rtl">
           <TabsTrigger value="deals" className="gap-2" data-testid="tab-deals">
             <Package className="h-4 w-4" />
             ניהול דילים
@@ -2033,7 +2081,7 @@ function AdminContentPage() {
         </TabsContent>
 
         <TabsContent value="analytics">
-          <AnalyticsDashboard />
+          <SystemAnalytics />
         </TabsContent>
       </Tabs>
     </div>

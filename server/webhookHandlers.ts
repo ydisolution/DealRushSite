@@ -1,4 +1,4 @@
-import { getStripeSync } from './stripeClient';
+import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string, uuid: string): Promise<void> {
@@ -11,7 +11,25 @@ export class WebhookHandlers {
       );
     }
 
-    const sync = await getStripeSync();
-    await sync.processWebhook(payload, signature, uuid);
+    // Verify webhook signature for security
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (webhookSecret) {
+      try {
+        const stripe = await getUncachableStripeClient();
+        const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+        console.log('✅ Webhook signature verified:', event.type);
+        
+        // Process verified webhook event
+        const sync = await getStripeSync();
+        await sync.processWebhook(payload, signature, uuid);
+      } catch (err: any) {
+        console.error('❌ Webhook signature verification failed:', err.message);
+        throw new Error(`Webhook signature verification failed: ${err.message}`);
+      }
+    } else {
+      console.warn('⚠️  STRIPE_WEBHOOK_SECRET not set - webhook verification disabled (NOT RECOMMENDED FOR PRODUCTION)');
+      const sync = await getStripeSync();
+      await sync.processWebhook(payload, signature, uuid);
+    }
   }
 }

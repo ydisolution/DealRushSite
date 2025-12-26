@@ -18,13 +18,14 @@ import {
   Flame,
   Clock,
   Package,
-  ShoppingCart
+  ShoppingCart,
+  Info
 } from "lucide-react";
 import { motion } from "framer-motion";
 import FomoCountdownTimer from "./FomoCountdownTimer";
 import ProgressBar from "./ProgressBar";
-import ActivityFeed from "./ActivityFeed";
 import ParticipantsList from "./ParticipantsList";
+import ProductCarousel from "./ProductCarousel";
 import { calculatePositionPricing } from "@/lib/pricing";
 
 interface DealDetailProps {
@@ -66,7 +67,6 @@ interface DealDetailProps {
 }
 
 export default function DealDetail({ deal, totalUnitsSold, activities, onJoin, onBack }: DealDetailProps) {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState("description");
   const [quantity, setQuantity] = useState(1);
   
@@ -136,13 +136,12 @@ export default function DealDetail({ deal, totalUnitsSold, activities, onJoin, o
   const savings = originalPrice - effectivePrice;
   const discount = tierInfo.hasDiscount ? tierInfo.currentDiscount : 0;
 
-  const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % images.length);
-  };
-
-  const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
-  };
+  // חישוב המחיר הדינמי שהמשתמש הבא ישלם
+  const nextPosition = unitsSold + 1;
+  const nextParticipantPricing = calculatePositionPricing(effectivePrice);
+  
+  const yourPrice = nextParticipantPricing.firstBuyerPrice;
+  const yourSavings = originalPrice - yourPrice;
 
   const tiersWithUnitsNeeded = sortedTiers.map((tier, index) => {
     const unitsNeeded = Math.max(0, tier.minParticipants - unitsSold);
@@ -156,461 +155,534 @@ export default function DealDetail({ deal, totalUnitsSold, activities, onJoin, o
     : description;
 
   return (
-    <div className="min-h-screen bg-background" data-testid="deal-detail">
-      <div className="container mx-auto px-4 py-6">
-        <Button 
-          variant="ghost" 
-          className="mb-4 gap-2"
-          onClick={onBack}
-          data-testid="button-back"
-        >
-          <ChevronRight className="h-4 w-4" />
-          חזרה לדילים
-        </Button>
+    <div className="min-h-screen bg-[#F7F7F9]" data-testid="deal-detail" dir="rtl">
+      {/* Back Button */}
+      <div className="bg-white border-b">
+        <div className="container mx-auto px-4 py-2.5">
+          <Button 
+            variant="ghost" 
+            className="gap-2 text-sm"
+            onClick={onBack}
+            data-testid="button-back"
+          >
+            <ChevronRight className="h-4 w-4" />
+            חזרה לדילים
+          </Button>
+        </div>
+      </div>
 
+      <div className="container mx-auto px-4 py-5 max-w-7xl">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-4xl mx-auto"
         >
-          <div className="text-center mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold mb-2" data-testid="deal-title">
-              {name}
-            </h1>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              {shortDescription}
-            </p>
-          </div>
+          {/* Hero Section - Unified Layout */}
+          <Card className="mb-5 overflow-hidden border-0 shadow-lg rounded-2xl bg-gradient-to-br from-white to-purple-50 relative">
+            {discount > 0 && (
+              <Badge 
+                className="absolute top-4 right-4 text-sm px-3 py-1.5 bg-gradient-to-r from-[#7B2FF7] to-purple-600 text-white z-10 shadow-lg"
+              >
+                {discount}% הנחה
+              </Badge>
+            )}
+            <CardContent className="p-6 lg:p-8">
+              <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-8 items-center max-w-7xl mx-auto">
+                {/* Right Side - All Content */}
+                <div className="space-y-5 lg:order-1">
+                  {/* Title */}
+                  <div className="text-right">
+                    <h1 className="text-3xl md:text-4xl font-bold text-[#111] leading-tight mb-2" data-testid="deal-title">
+                      {name}
+                    </h1>
+                    <p className="text-base text-[#777]">
+                      {description}
+                    </p>
+                  </div>
 
-          <div className="relative mb-6">
-            <div className="max-w-md mx-auto">
-              <div className="relative aspect-square rounded-xl overflow-hidden bg-muted shadow-lg">
-                <img 
-                  src={images[currentImageIndex]} 
-                  alt={name}
-                  className="w-full h-full object-cover"
-                  data-testid="deal-main-image"
-                />
-                {images.length > 1 && (
-                  <>
-                    <Button 
-                      variant="secondary" 
-                      size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 shadow-lg"
-                      onClick={prevImage}
-                      data-testid="button-prev-image"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="secondary" 
-                      size="icon"
-                      className="absolute left-2 top-1/2 -translate-y-1/2 shadow-lg"
-                      onClick={nextImage}
-                      data-testid="button-next-image"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
-              </div>
-              
-              {images.length > 1 && (
-                <div className="flex justify-center gap-2 mt-3">
-                  {images.map((img, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setCurrentImageIndex(idx)}
-                      className={`shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all ${
-                        idx === currentImageIndex ? "border-primary ring-2 ring-primary/30" : "border-transparent opacity-70 hover:opacity-100"
-                      }`}
-                      data-testid={`thumbnail-${idx}`}
-                    >
-                      <img src={img} alt="" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+                  {/* Countdown Timer - Centered */}
+                  <div className="flex justify-center" dir="ltr">
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-2 rounded-xl border-2 border-purple-200 shadow-sm">
+                      <FomoCountdownTimer endTime={endTime} size="md" showEndDate={false} />
+                    </div>
+                  </div>
 
-          <Card className="mb-6 overflow-hidden">
-            <CardContent className="p-4 md:p-6">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex-1 w-full md:w-auto" dir="ltr">
-                  <FomoCountdownTimer endTime={endTime} size="md" showEndDate={true} />
-                </div>
-                
-                <div className="flex items-center gap-4">
-                  {discount > 0 && (
-                    <Badge variant="destructive" className="text-sm px-2 py-1">
-                      {discount}%
-                    </Badge>
-                  )}
-                  <div className="text-left">
-                    {discount > 0 ? (
-                      <>
-                        <p className="text-sm text-muted-foreground line-through">
-                          ₪{originalPrice.toLocaleString()}
+                  {/* Pricing Info - No separate card */}
+                  <div className="space-y-3 pt-4 border-t-2 border-purple-200">
+                    {/* Original Price - Right aligned */}
+                    <div className="flex items-center gap-3 text-right">
+                      <span className="text-sm text-[#777]">מחיר קודם:</span>
+                      <span className="text-xl text-[#777] line-through">
+                        ₪{originalPrice.toLocaleString()}
+                      </span>
+                    </div>
+                    
+                    {/* Average Price with Tooltip - Right aligned */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl font-bold text-[#111]">מחיר ממוצע</span>
+                        <div className="group relative">
+                          <div className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center cursor-help">
+                            <Info className="h-3.5 w-3.5 text-[#7B2FF7]" />
+                          </div>
+                          <div className="absolute right-0 top-7 w-72 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 shadow-xl">
+                            <p className="leading-relaxed text-right">
+                              בכל מדרגה נקבע אחוז הנחה קבוע מהמחיר המקורי. הראשון שמצטרף מקבל מחיר נמוך יותר והאחרון מחיר גבוה יותר מהמחיר הממוצע של המדרגה.
+                            </p>
+                            <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-5xl font-extrabold text-[#7B2FF7]">
+                        ₪{yourPrice.toLocaleString()}
+                      </span>
+                    </div>
+                    
+                    {/* Savings */}
+                    {yourSavings > 0 && (
+                      <div className="bg-green-50 border-2 border-green-200 rounded-xl p-3 text-right">
+                        <p className="text-green-700 font-bold text-base">
+                          💰 חיסכון של ₪{yourSavings.toLocaleString()}!
                         </p>
-                        <p className="text-2xl font-bold text-primary">
-                          ₪{effectivePrice.toLocaleString()}
+                        <p className="text-green-600 text-sm mt-1">
+                          ⚡ המחיר עשוי לרדת עוד אם יצטרפו משתתפים נוספים
                         </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm text-muted-foreground">מחיר מלא</p>
-                        <p className="text-2xl font-bold">
-                          ₪{originalPrice.toLocaleString()}
-                        </p>
-                      </>
+                      </div>
                     )}
+
+                    {/* Inventory Progress - FOMO */}
+                    <div className="pt-3 bg-orange-50/50 border-2 border-orange-200 rounded-xl p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold text-orange-600">נותרו {targetParticipants - unitsSold} יחידות בלבד!</span>
+                        <span className="text-sm text-[#777]">{unitsSold}/{targetParticipants} נמכר</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden" dir="rtl">
+                        <div 
+                          className="h-full bg-gradient-to-l from-orange-500 to-red-500 transition-all duration-500"
+                          style={{ width: `${Math.round((unitsSold / targetParticipants) * 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-orange-600 mt-2 text-right flex items-center gap-1">
+                        <Flame className="h-3.5 w-3.5" />
+                        <span className="font-semibold">המלאי אוזל במהירות!</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Left Side - Product Carousel */}
+                <div className="flex justify-center items-center lg:order-2">
+                  <div className="w-full max-w-[400px]">
+                    <ProductCarousel images={images} productName={name} />
                   </div>
                 </div>
               </div>
-              
-              {savings > 0 && (
-                <p className="text-center text-success font-medium mt-3">
-                  חוסכים ₪{savings.toLocaleString()}!
-                </p>
-              )}
             </CardContent>
           </Card>
 
-          {!tierInfo.hasDiscount && sortedTiers.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-            >
-              <Card className="border-warning/50 bg-gradient-to-r from-warning/10 to-accent/10 mb-6" data-testid="no-discount-banner">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-warning/20">
-                      <Package className="h-6 w-6 text-warning" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-lg">
-                        עוד{" "}
-                        <span className="text-warning text-xl">{tierInfo.unitsNeeded}</span>{" "}
-                        יחידות להפעלת ההנחה!
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        כשנגיע ל-{sortedTiers[0].minParticipants} יחידות, כולם יקבלו {sortedTiers[0].discount}% הנחה
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-
-          {tierInfo.hasDiscount && tierInfo.nextTier && tierInfo.unitsNeeded > 0 && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-            >
-              <Card className="border-urgent/50 bg-gradient-to-r from-urgent/10 to-warning/10 mb-6" data-testid="fomo-banner">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-urgent/20 animate-pulse">
-                      <Flame className="h-6 w-6 text-urgent" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-lg">
-                        עוד{" "}
-                        <span className="text-urgent text-xl">{tierInfo.unitsNeeded}</span>{" "}
-                        יחידות למדרגה הבאה!
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        במדרגה הבאה: {tierInfo.nextTier.discount}% הנחה
-                      </p>
-                    </div>
-                    <div className="text-left">
-                      <p className="text-xs text-muted-foreground">מחיר הבא</p>
-                      <p className="text-lg font-bold text-success">
-                        ₪{(tierInfo.nextTier.price || Math.round(originalPrice * (1 - tierInfo.nextTier.discount / 100))).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-
-          <Card className="mb-6">
-            <CardContent className="p-4 md:p-6">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground mb-1">כמות יחידות</p>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        disabled={quantity <= 1}
-                        data-testid="button-decrease-quantity"
-                      >
-                        <span className="text-lg font-bold">-</span>
-                      </Button>
-                      <span className="text-2xl font-bold min-w-[3rem] text-center" data-testid="text-quantity">
-                        {quantity}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setQuantity(Math.min(maxQuantity, quantity + 1))}
-                        disabled={quantity >= maxQuantity}
-                        data-testid="button-increase-quantity"
-                      >
-                        <span className="text-lg font-bold">+</span>
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="h-12 w-px bg-border hidden md:block" />
-                  
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground mb-1">סה"כ לתשלום</p>
-                    <div className="flex items-center gap-2">
-                      {savings > 0 && (
-                        <span className="text-sm text-muted-foreground line-through">
-                          ₪{(originalPrice * quantity).toLocaleString()}
-                        </span>
-                      )}
-                      <span className="text-2xl font-bold text-primary" data-testid="text-total-price">
-                        ₪{(effectivePrice * quantity).toLocaleString()}
-                      </span>
-                    </div>
-                    {quantity > 1 && (
-                      <p className="text-xs text-muted-foreground">
-                        ₪{effectivePrice.toLocaleString()} ליחידה
-                      </p>
-                    )}
-                  </div>
-                </div>
+          {/* Action Box - Purchase Section */}
+          <Card className="mb-5 border-0 shadow-xl rounded-2xl overflow-hidden bg-gradient-to-br from-white to-purple-50">
+            <CardContent className="p-5">
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-[#111] text-center">הצטרפו לדיל עכשיו</h3>
                 
-                <Button 
-                  size="lg" 
-                  className="gap-2 text-lg px-8 py-6 shadow-lg shadow-primary/25 hover:shadow-xl w-full md:w-auto"
+                {/* Quantity Selector */}
+                <div className="flex items-center justify-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    disabled={quantity <= 1}
+                    className="h-11 w-11 rounded-xl border-2 text-lg"
+                  >
+                    -
+                  </Button>
+                  <div className="text-center min-w-[100px]">
+                    <p className="text-xs text-[#777]">כמות</p>
+                    <p className="text-3xl font-bold text-[#7B2FF7]">{quantity}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setQuantity(Math.min(maxQuantity, quantity + 1))}
+                    disabled={quantity >= maxQuantity}
+                    className="h-11 w-11 rounded-xl border-2 text-lg"
+                  >
+                    +
+                  </Button>
+                </div>
+
+                {/* Total Price */}
+                <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-4 text-center border-2 border-[#7B2FF7]">
+                  <p className="text-sm text-[#777] mb-1">סה"כ לתשלום</p>
+                  <p className="text-4xl font-extrabold text-[#7B2FF7]">
+                    ₪{(yourPrice * quantity).toLocaleString()}
+                  </p>
+                  {savings > 0 && (
+                    <p className="text-green-600 font-semibold text-base mt-1.5">
+                      חוסכים ₪{(savings * quantity).toLocaleString()}!
+                    </p>
+                  )}
+                </div>
+
+                {/* Main CTA Button */}
+                <Button
+                  size="lg"
+                  className="w-full h-14 text-lg font-bold bg-gradient-to-r from-[#7B2FF7] to-purple-600 hover:from-purple-600 hover:to-[#7B2FF7] shadow-xl rounded-xl"
                   onClick={() => onJoin?.(quantity)}
                   data-testid="button-join-deal"
                 >
-                  <ShoppingCart className="h-5 w-5" />
-                  הצטרפו לדיל
-                  {savings > 0 && ` - חסכו ₪${(savings * quantity).toLocaleString()}`}
+                  <ShoppingCart className="h-5 w-5 ml-2" />
+                  הצטרפו לדיל – חסכו ₪{(savings * quantity).toLocaleString()}
                 </Button>
-              </div>
-              
-              {quantity > 1 && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  className="mt-4 pt-4 border-t"
-                >
-                  <div className="flex items-center justify-center gap-2 text-success">
-                    <Check className="h-4 w-4" />
-                    <span className="text-sm font-medium">
-                      כל {quantity} היחידות יחויבו במחיר הסופי הנמוך ביותר!
-                    </span>
+
+                {/* Trust Badges */}
+                <div className="grid grid-cols-2 gap-2.5 mt-4">
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white shadow-sm border">
+                    <Lock className="h-4 w-4 text-[#7B2FF7]" />
+                    <span className="text-xs font-medium">נעול עבורך</span>
                   </div>
-                </motion.div>
-              )}
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white shadow-sm border">
+                    <TrendingDown className="h-4 w-4 text-green-600" />
+                    <span className="text-xs font-medium">ירד? תשלם פחות</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white shadow-sm border">
+                    <RefreshCcw className="h-4 w-4 text-[#7B2FF7]" />
+                    <span className="text-xs font-medium">החזר 14 יום</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white shadow-sm border">
+                    <Truck className="h-4 w-4 text-green-600" />
+                    <span className="text-xs font-medium">משלוח חינם</span>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <div className="flex items-center justify-center gap-3 p-3 rounded-lg bg-muted/50 mb-6">
-            <div className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" />
-              <span className="font-bold text-lg">{unitsSold}</span>
-              <span className="text-muted-foreground">יחידות נמכרו</span>
-            </div>
-            <span className="text-muted-foreground">|</span>
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              <span className="font-bold">{participants}</span>
-              <span className="text-muted-foreground">לקוחות</span>
-            </div>
-          </div>
-
-          <ProgressBar 
-            current={unitsSold} 
-            target={targetParticipants}
-            size="lg"
-            label="יחידות"
-          />
-
-          <Card className="mt-6 mb-6">
-            <CardContent className="p-4 md:p-6">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                <TrendingDown className="h-5 w-5 text-primary" />
-                מדרגות הנחה - לפי כמות יחידות
-              </h3>
+          {/* Group Progress & Tiers Display - Combined */}
+          <Card className="mb-5 border-0 shadow-lg rounded-2xl overflow-hidden">
+            <CardContent className="p-5">
               <div className="space-y-3">
-                {tiersWithUnitsNeeded.map((tier, idx) => (
-                  <div 
-                    key={idx}
-                    className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
-                      tier.isCurrentTier 
-                        ? "border-primary bg-primary/5 ring-1 ring-primary/20" 
-                        : tier.isUnlocked 
-                          ? "border-success/30 bg-success/5" 
-                          : "border-border bg-muted/30"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm ${
-                        tier.isUnlocked ? "bg-success text-white" : "bg-muted"
-                      }`}>
-                        {tier.isUnlocked ? (
-                          <Check className="h-4 w-4" />
-                        ) : (
-                          <span className="font-bold">{tier.tierNumber}</span>
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-semibold">{tier.discount}% הנחה</p>
-                        <p className="text-xs text-muted-foreground">
-                          {tier.minParticipants}-{tier.maxParticipants} יחידות
-                        </p>
-                      </div>
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-gradient-to-br from-[#7B2FF7] to-pink-500 rounded-full">
+                      <Users className="h-5 w-5 text-white" />
                     </div>
-                    <div className="text-left">
-                      <p className="font-bold">
-                        ₪{(tier.price || Math.round(originalPrice * (1 - tier.discount / 100))).toLocaleString()}
+                    <div>
+                      <h3 className="text-lg font-bold text-[#111]">התקדמות הקבוצה</h3>
+                      <p className="text-sm text-[#777]">
+                        {unitsSold} / {targetParticipants} יחידות נרכשו
+                        <span className="text-[#7B2FF7] font-semibold mr-1">
+                          ({Math.round((unitsSold / targetParticipants) * 100)}%)
+                        </span>
                       </p>
-                      {!tier.isUnlocked && tier.unitsNeeded > 0 && (
-                        <Badge variant="outline" className="text-xs">
-                          עוד {tier.unitsNeeded} יחידות
-                        </Badge>
-                      )}
-                      {tier.isCurrentTier && (
-                        <Badge variant="default" className="text-xs">
-                          מדרגה נוכחית
-                        </Badge>
-                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  {tierInfo.nextTier && (
+                    <div className="text-left">
+                      <p className="text-xs text-[#777]">עוד למדרגה הבאה</p>
+                      <p className="text-2xl font-bold text-[#7B2FF7]">{tierInfo.unitsNeeded}</p>
+                    </div>
+                  )}
+                </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-6">
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 justify-center">
-              <Lock className="h-4 w-4 text-primary" />
-              <span>המחיר נעול עבורכם</span>
-            </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 justify-center">
-              <TrendingDown className="h-4 w-4 text-success" />
-              <span>ירד? תשלמו פחות</span>
-            </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 justify-center">
-              <RefreshCcw className="h-4 w-4 text-primary" />
-              <span>החזר עד 14 ימים</span>
-            </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 justify-center">
-              <Truck className="h-4 w-4 text-primary" />
-              <span>משלוח חינם</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-            <div className="lg:col-span-2">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="w-full justify-start">
-                  <TabsTrigger value="description">תיאור המוצר</TabsTrigger>
-                  <TabsTrigger value="specs">מפרט טכני</TabsTrigger>
-                  <TabsTrigger value="reviews">ביקורות</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="description" className="mt-4">
-                  <Card>
-                    <CardContent className="p-4 prose prose-sm max-w-none">
-                      <p>{description}</p>
-                      <h3>יתרונות עיקריים:</h3>
-                      <ul>
-                        <li>איכות פרימיום מהיצרן</li>
-                        <li>אחריות יצרן מלאה</li>
-                        <li>משלוח מהיר עד הבית</li>
-                        <li>תמיכה טכנית מלאה</li>
-                      </ul>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                
-                <TabsContent value="specs" className="mt-4">
-                  <Card>
-                    <CardContent className="p-4">
-                      <dl className="space-y-2">
-                        {specs.map((spec, idx) => (
-                          <div key={idx} className="flex justify-between py-2 border-b last:border-0">
-                            <dt className="text-muted-foreground">{spec.label}</dt>
-                            <dd className="font-medium">{spec.value}</dd>
+                {sortedTiers.map((tier, index) => {
+                  const tierPrice = tier.price || Math.round(originalPrice * (1 - tier.discount / 100));
+                  
+                  // Determine tier status
+                  let isUnlocked = false;  // Tier completed (passed)
+                  let isCurrent = false;   // Tier currently being filled (purple)
+                  
+                  // Use maxParticipants as the goal for all tiers
+                  const tierGoal = tier.maxParticipants;
+                  
+                  // Find which tier we're currently in
+                  const currentTierIndex = sortedTiers.findIndex((t, i) => {
+                    if (i === 0 && unitsSold <= t.maxParticipants) {
+                      return true; // First tier, haven't exceeded maximum yet
+                    }
+                    return unitsSold >= t.minParticipants && unitsSold <= t.maxParticipants;
+                  });
+                  
+                  if (index < currentTierIndex || (currentTierIndex === -1 && unitsSold >= tier.maxParticipants)) {
+                    // We've passed this tier completely - GREEN
+                    isUnlocked = true;
+                  } else if (index === currentTierIndex) {
+                    // This is the tier currently being filled - PURPLE
+                    isCurrent = true;
+                  }
+                  // else: tier is locked (gray)
+                  
+                  // Calculate progress
+                  let tierProgress = 0;
+                  let tierProgressText = `מקסימום ${tierGoal} יחידות`;
+                  
+                  if (isUnlocked) {
+                    // Tier completed
+                    tierProgress = 100;
+                  } else if (isCurrent) {
+                    // Currently filling - show progress towards goal
+                    tierProgress = Math.min((unitsSold / tierGoal) * 100, 100);
+                  } else {
+                    // Locked
+                    tierProgress = 0;
+                  }
+                  
+                  return (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className={`relative p-4 rounded-xl border-2 transition-all ${
+                        isCurrent 
+                          ? 'bg-gradient-to-r from-[#7B2FF7]/15 to-pink-500/15 border-[#7B2FF7] shadow-lg' 
+                          : isUnlocked 
+                            ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-700 shadow-md' 
+                            : 'bg-gradient-to-r from-gray-50 via-slate-50 to-purple-50/30 border-gray-300 opacity-70'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Status Icon */}
+                        <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center shadow-md ${
+                          isCurrent 
+                            ? 'bg-gradient-to-br from-[#7B2FF7] to-pink-500 text-white' 
+                            : isUnlocked 
+                              ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white' 
+                              : 'bg-gradient-to-br from-gray-300 to-slate-300 text-gray-500'
+                        }`}>
+                          {isUnlocked ? (
+                            <Check className="h-6 w-6" strokeWidth={3} />
+                          ) : isCurrent ? (
+                            <Users className="h-6 w-6" strokeWidth={2.5} />
+                          ) : (
+                            <Lock className="h-5 w-5" />
+                          )}
+                        </div>
+                        
+                        {/* Tier Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`text-lg font-bold ${
+                              isCurrent ? 'text-[#7B2FF7]' : isUnlocked ? 'text-green-700' : 'text-gray-700'
+                            }`}>
+                              מדרגה {index + 1}
+                            </span>
+                            {isCurrent && (
+                              <Badge className="bg-[#7B2FF7] text-white text-xs px-2 py-0.5">
+                                ✨ אתם כאן!
+                              </Badge>
+                            )}
                           </div>
-                        ))}
-                      </dl>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                
-                <TabsContent value="reviews" className="mt-4">
-                  <Card>
-                    <CardContent className="p-4 space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="text-3xl font-bold">4.8</div>
-                        <div>
-                          <div className="flex gap-0.5">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star 
-                                key={star} 
-                                className={`h-4 w-4 ${star <= 4 ? "fill-warning text-warning" : "fill-warning/30 text-warning/30"}`}
+                          
+                          <div className="space-y-2">
+                            {/* Tier Details */}
+                            <div className="flex items-center gap-2 text-sm mb-2">
+                              <span className={`font-semibold ${
+                                isCurrent ? 'text-[#7B2FF7]' : isUnlocked ? 'text-green-600' : 'text-gray-600'
+                              }`}>
+                                {tier.discount}% הנחה
+                              </span>
+                            </div>
+                            
+                            {/* Progress Text */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className={`font-bold ${
+                                  isCurrent ? 'text-[#7B2FF7]' : isUnlocked ? 'text-green-600' : 'text-gray-600'
+                                }`}>
+                                  {tierProgressText}
+                                </span>
+                                {isUnlocked && (
+                                  <span className="text-xs text-green-600 font-semibold">
+                                    ✓ הושלם!
+                                  </span>
+                                )}
+                                {isCurrent && unitsSold < tierGoal && (
+                                  <span className="text-xs text-[#7B2FF7] font-semibold">
+                                    נותרו {tierGoal - unitsSold} יחידות
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Progress Bar */}
+                            <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                              <div 
+                                className={`h-full transition-all duration-500 ${
+                                  isCurrent 
+                                    ? 'bg-gradient-to-l from-[#7B2FF7] to-pink-500' 
+                                    : isUnlocked 
+                                      ? 'bg-gradient-to-l from-green-500 to-emerald-600' 
+                                      : 'bg-transparent'
+                                }`}
+                                style={{ width: `${tierProgress}%` }}
                               />
-                            ))}
+                            </div>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            מבוסס על {reviews.length || 127} ביקורות
+                        </div>
+                        
+                        {/* Price */}
+                        <div className="flex-shrink-0 text-left">
+                          <p className="text-xs text-gray-500 mb-0.5">מחיר</p>
+                          <p className={`text-2xl font-bold ${
+                            isCurrent ? 'text-[#7B2FF7]' : isUnlocked ? 'text-green-600' : 'text-gray-700'
+                          }`}>
+                            ₪{tierPrice.toLocaleString()}
                           </p>
                         </div>
                       </div>
-                      
-                      <div className="space-y-3">
-                        {reviews.slice(0, 3).map((review) => (
-                          <div key={review.id} className="border-t pt-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-7 w-7">
-                                  <AvatarFallback className="text-xs">{review.userName[0]}</AvatarFallback>
+
+                      {/* Current Indicator Line */}
+                      {isCurrent && (
+                        <div className="absolute inset-0 border-2 border-[#7B2FF7] rounded-xl pointer-events-none animate-pulse" />
+                      )}
+                    </motion.div>
+                  );
+                })}
+
+                {/* Legend */}
+                <div className="flex items-center justify-center gap-4 pt-3 border-t text-xs text-gray-500">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-gradient-to-br from-green-500 to-emerald-600" />
+                    <span>הושג</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-gradient-to-br from-[#7B2FF7] to-pink-500" />
+                    <span>נוכחי</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-gray-300" />
+                    <span>נעול</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Product Details Section */}
+          <Card className="mb-5 border-0 shadow-lg rounded-2xl">
+            <CardContent className="p-5">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-3 h-12 rounded-xl bg-gray-100">
+                  <TabsTrigger value="reviews" className="rounded-lg text-sm font-semibold">ביקורות</TabsTrigger>
+                  <TabsTrigger value="specs" className="rounded-lg text-sm font-semibold">מפרט</TabsTrigger>
+                  <TabsTrigger value="description" className="rounded-lg text-sm font-semibold">תיאור</TabsTrigger>
+                </TabsList>
+                
+
+                <TabsContent value="description" className="mt-4 space-y-3">
+                  <div className="prose max-w-none text-right">
+                    <p className="text-[#111] text-base leading-relaxed whitespace-pre-wrap text-right">{description}</p>
+                  </div>
+                  
+                  {/* Why Join This Deal Section */}
+                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-4 mt-4 border-2 border-purple-200 text-right">
+                    <h4 className="text-lg font-bold text-[#111] mb-3 flex items-center justify-end gap-2">
+                      למה להצטרף לדיל הזה?
+                      <Star className="h-5 w-5 text-[#7B2FF7]" />
+                    </h4>
+                    <ul className="space-y-2">
+                      <li className="flex items-start gap-2.5 justify-end">
+                        <span className="text-[#111] text-sm text-right">משלוח חינם לכל הארץ</span>
+                        <Check className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                      </li>
+                      <li className="flex items-start gap-2.5 justify-end">
+                        <span className="text-[#111] text-sm text-right">החזר כספי מלא עד 14 יום</span>
+                        <Check className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                      </li>
+                      <li className="flex items-start gap-2.5 justify-end">
+                        <span className="text-[#111] text-sm text-right">אחריות יצרן מלאה</span>
+                        <Check className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                      </li>
+                      <li className="flex items-start gap-2.5 justify-end">
+                        <span className="text-[#111] text-sm text-right">משלמים פחות ככל שמצטרפים יותר</span>
+                        <Check className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                      </li>
+                      <li className="flex items-start gap-2.5 justify-end">
+                        <span className="text-[#111] text-sm text-right">מחיר נעול - לא ישתנה לרעה</span>
+                        <Check className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                      </li>
+                    </ul>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="specs" className="mt-4">
+                  {specs.length > 0 ? (
+                    <div className="grid gap-2">
+                      {specs.map((spec, index) => (
+                        <div 
+                          key={index} 
+                          className="flex justify-between items-center p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
+                          <span className="text-[#777] text-sm">{spec.value}</span>
+                          <span className="font-semibold text-[#111] text-sm">{spec.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-[#777] py-6 text-sm">אין מפרט זמין</p>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="reviews" className="mt-4">
+                  {reviews.length > 0 ? (
+                    <div className="space-y-3">
+                      {reviews.map((review) => (
+                        <Card key={review.id} className="border-2 rounded-xl">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center gap-2.5">
+                                <Avatar>
+                                  <AvatarFallback className="bg-[#7B2FF7] text-white text-sm">
+                                    {review.userName.charAt(0)}
+                                  </AvatarFallback>
                                 </Avatar>
-                                <span className="font-medium text-sm">{review.userName}</span>
+                                <div>
+                                  <p className="font-semibold text-[#111] text-sm">{review.userName}</p>
+                                  <div className="flex gap-0.5">
+                                    {Array.from({ length: 5 }).map((_, i) => (
+                                      <Star
+                                        key={i}
+                                        className={`h-3.5 w-3.5 ${
+                                          i < review.rating
+                                            ? "fill-yellow-400 text-yellow-400"
+                                            : "fill-gray-200 text-gray-200"
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex gap-0.5">
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                  <Star 
-                                    key={star} 
-                                    className={`h-3 w-3 ${star <= review.rating ? "fill-warning text-warning" : "text-muted"}`}
-                                  />
-                                ))}
-                              </div>
+                              <span className="text-xs text-[#777]">
+                                {new Date(review.date).toLocaleDateString("he-IL")}
+                              </span>
                             </div>
-                            <p className="text-sm text-muted-foreground">{review.comment}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                            <p className="text-[#111] text-sm">{review.comment}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-[#777] py-6 text-sm">אין ביקורות עדיין</p>
+                  )}
                 </TabsContent>
               </Tabs>
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="space-y-4">
+          {/* Participants */}
+          <Card className="border-0 shadow-lg rounded-2xl">
+            <CardContent className="p-5">
+              <h3 className="text-lg font-bold text-[#111] mb-3">משתתפים</h3>
               <ParticipantsList 
                 dealId={deal.id} 
-                originalPrice={originalPrice} 
+                originalPrice={originalPrice}
+                tiers={deal.tiers}
+                totalParticipants={unitsSold}
               />
-              <ActivityFeed activities={activities} />
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </motion.div>
       </div>
     </div>

@@ -147,7 +147,7 @@ export default function SupplierCreateDeal() {
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-8 max-w-4xl" dir="rtl">
         <div className="flex items-center gap-4 mb-8">
           <Link href="/supplier">
             <Button variant="ghost" size="icon" data-testid="button-back-to-dashboard">

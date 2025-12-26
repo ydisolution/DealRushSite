@@ -59,7 +59,7 @@ export async function registerUser(
     lastName: lastName || null,
     phone: phone || null,
     isAdmin,
-    isEmailVerified: "false",
+    isEmailVerified: "false", // Users must verify email before access
     emailVerificationToken: verificationToken,
     emailVerificationExpires: verificationExpiry,
   });

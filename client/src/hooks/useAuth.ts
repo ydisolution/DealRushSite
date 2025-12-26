@@ -59,8 +59,17 @@ export function useAuth() {
       const res = await apiRequest("POST", "/api/auth/login", data);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    onSuccess: (response) => {
+      // Clear all cached data EXCEPT the new user data to prevent showing previous user's data
+      const excludeKeys = ["/api/auth/user"];
+      queryClient.getQueryCache().getAll().forEach((query) => {
+        const key = query.queryKey[0];
+        if (!excludeKeys.includes(key as string)) {
+          queryClient.removeQueries({ queryKey: query.queryKey });
+        }
+      });
+      // Set the new user data immediately
+      queryClient.setQueryData(["/api/auth/user"], response.user);
     },
   });
 
@@ -80,8 +89,10 @@ export function useAuth() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      queryClient.setQueryData(["/api/auth/user"], null);
+      // Clear ALL cached data when logging out to prevent showing previous user's data
+      queryClient.clear();
+      // Force reload the page to ensure complete state reset
+      window.location.href = "/";
     },
   });
 
@@ -117,6 +128,7 @@ export function useAuth() {
   });
 
   const isAdmin = user?.isAdmin === "true";
+  const isSupplier = user?.isSupplier === "true";
   const isEmailVerified = user?.isEmailVerified === "true";
 
   return {
@@ -124,6 +136,7 @@ export function useAuth() {
     isLoading: isLoading && !isFetched,
     isAuthenticated: !!user,
     isAdmin,
+    isSupplier,
     isEmailVerified,
     error,
     login: loginMutation.mutateAsync,

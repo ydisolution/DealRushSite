@@ -1,21 +1,38 @@
 import { useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import Checkout from "@/components/Checkout";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import type { Deal } from "@shared/schema";
 
 export default function CheckoutPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const { toast } = useToast();
 
   const { data: deal, isLoading } = useQuery<Deal>({
-    queryKey: ["/api/deals", id],
+    queryKey: [`/api/deals/${id}`],
     enabled: !!id,
   });
 
-  if (isLoading) {
+  // Redirect to deal page if not authenticated
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      toast({
+        title: "נדרשת התחברות",
+        description: "יש להתחבר כדי להצטרף לדיל",
+        variant: "destructive",
+      });
+      setLocation(`/deal/${id}`);
+    }
+  }, [user, isAuthLoading, id, setLocation, toast]);
+
+  if (isAuthLoading || isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8" dir="rtl">
         <Skeleton className="h-8 w-32 mb-6" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
@@ -29,7 +46,7 @@ export default function CheckoutPage() {
 
   if (!deal) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
+      <div className="container mx-auto px-4 py-8 text-center" dir="rtl">
         <h1 className="text-2xl font-bold mb-4">הדיל לא נמצא</h1>
         <button 
           onClick={() => setLocation("/")}

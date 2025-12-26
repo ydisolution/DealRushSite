@@ -71,7 +71,7 @@ export default function HowItWorksPage({ onGetStarted }: HowItWorksPageProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-background" data-testid="how-it-works-page">
+    <div className="min-h-screen bg-background" data-testid="how-it-works-page" dir="rtl">
       <section className="py-16 bg-gradient-to-b from-accent/30 to-background">
         <div className="container mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
@@ -81,8 +81,8 @@ export default function HowItWorksPage({ onGetStarted }: HowItWorksPageProps) {
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
             איך <span className="text-primary">DealRush</span> עובד?
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            קניות קבוצתיות שחוסכות לכם כסף אמיתי. ככל שיותר אנשים קונים, המחיר יורד לכולם!
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto whitespace-nowrap">
+            קניות קבוצתיות שחוסכות לכם כסף אמיתי. ככל שיותר אנשים קונים, המחיר יורד וכולם מרוויחים!
           </p>
         </div>
       </section>

@@ -9,25 +9,26 @@ import { nanoid } from "nanoid";
 const viteLogger = createLogger();
 
 export async function setupVite(server: Server, app: Express) {
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server, path: "/vite-hmr" },
-    allowedHosts: true as const,
-  };
+  try {
+    const serverOptions = {
+      middlewareMode: true,
+      hmr: { server, path: "/vite-hmr" },
+      allowedHosts: true as const,
+    };
 
-  const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
+    const vite = await createViteServer({
+      ...viteConfig,
+      configFile: false,
+      customLogger: {
+        ...viteLogger,
+        error: (msg, options) => {
+          viteLogger.error(msg, options);
+          // Don't exit - just log the error
+        },
       },
-    },
-    server: serverOptions,
-    appType: "custom",
-  });
+      server: serverOptions,
+      appType: "custom",
+    });
 
   app.use(vite.middlewares);
 
@@ -55,4 +56,8 @@ export async function setupVite(server: Server, app: Express) {
       next(e);
     }
   });
+  } catch (error) {
+    console.error('❌ Fatal error setting up Vite:', error);
+    throw error;
+  }
 }

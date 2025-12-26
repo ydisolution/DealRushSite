@@ -16,7 +16,8 @@ interface HomeProps {
 
 export default function Home({ onOpenAuth }: HomeProps) {
   const [, setLocation] = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.isAdmin === "true";
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState("");
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000000]);
@@ -102,6 +103,10 @@ export default function Home({ onOpenAuth }: HomeProps) {
     }
   };
 
+  const handleEditDeal = (dealId: string) => {
+    setLocation(`/admin/deals/${dealId}/edit`);
+  };
+
   return (
     <div data-testid="home-page">
       <HeroSection 
@@ -113,7 +118,7 @@ export default function Home({ onOpenAuth }: HomeProps) {
         selectedCategory={selectedCategory}
         onSelectCategory={setSelectedCategory}
       />
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6" dir="rtl">
         <SearchFilter
           onSearchChange={setSearchTerm}
           onCategoryChange={setSelectedCategory}
@@ -134,6 +139,8 @@ export default function Home({ onOpenAuth }: HomeProps) {
           }
           onViewDeal={handleViewDeal}
           onJoinDeal={handleJoinDeal}
+          onEditDeal={handleEditDeal}
+          isAdmin={isAdmin}
           isLoading={isLoading}
         />
       </div>

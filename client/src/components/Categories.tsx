@@ -12,6 +12,7 @@ import {
   LayoutGrid
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLocation } from "wouter";
 
 export interface Category {
   id: string;
@@ -45,6 +46,16 @@ export default function Categories({
   onSelectCategory,
   showAll = true
 }: CategoriesProps) {
+  const [, setLocation] = useLocation();
+  
+  const handleCategoryClick = (categoryId: string) => {
+    if (categoryId === "apartments") {
+      setLocation("/real-estate");
+    } else {
+      onSelectCategory?.(categoryId);
+    }
+  };
+  
   return (
     <section className="py-8 bg-gradient-to-b from-background to-muted/20" data-testid="categories-section">
       <div className="container mx-auto px-4">
@@ -94,7 +105,7 @@ export default function Categories({
                 key={category.id}
                 whileHover={{ scale: 1.05, y: -4 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => onSelectCategory?.(category.id)}
+                onClick={() => handleCategoryClick(category.id)}
                 className={`flex flex-col items-center gap-2 transition-all duration-300 ${
                   isSelected ? "opacity-100" : "opacity-70 hover:opacity-100"
                 }`}

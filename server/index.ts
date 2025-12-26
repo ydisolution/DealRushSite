@@ -1,12 +1,19 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { registerRealEstateRoutes } from "./realEstateRoutes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { notificationService } from "./websocket";
 import { dealClosureService } from "./dealClosureService";
+import { whatsappService } from "./whatsappService";
+import { initSentry, setupSentryErrorHandler } from "./monitoring";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Initialize Sentry before anything else
+const sentryEnabled = initSentry(app);
 
 declare module "http" {
   interface IncomingMessage {
@@ -64,13 +71,21 @@ app.use((req, res, next) => {
 (async () => {
   notificationService.initialize(httpServer);
   await registerRoutes(httpServer, app);
+  registerRealEstateRoutes(app); // Register real estate routes
+
+  // Sentry error handler (must be after routes, before other error handlers)
+  if (sentryEnabled) {
+    setupSentryErrorHandler(app);
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
+    // Log error (Sentry already captured it)
+    log(`Error ${status}: ${message}`, 'error');
+
     res.status(status).json({ message });
-    throw err;
   });
 
   // importantly only setup vite in development and after
@@ -88,15 +103,12 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-      dealClosureService.start();
-    },
-  );
-})();
+  httpServer.listen(port, () => {
+    log(`serving on port ${port}`);
+    log(`WhatsApp service status: ${whatsappService.isEnabled() ? 'ENABLED ✅' : 'DISABLED ⚠️'}`);
+    dealClosureService.start();
+  });
+})().catch((error) => {
+  console.error('Fatal error starting server:', error);
+  process.exit(1);
+});

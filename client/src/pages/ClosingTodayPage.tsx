@@ -42,7 +42,7 @@ export default function ClosingTodayPage() {
   return (
     <div className="min-h-screen bg-background" dir="rtl" data-testid="closing-today-page">
       <div className="bg-gradient-to-b from-urgent/10 to-background py-8 border-b">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4" dir="rtl">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 rounded-full bg-urgent/20 animate-pulse">
               <Flame className="h-8 w-8 text-urgent" />

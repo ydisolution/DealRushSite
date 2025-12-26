@@ -6,7 +6,9 @@ interface DealsGridProps {
   title?: string;
   onJoinDeal?: (dealId: string) => void;
   onViewDeal?: (dealId: string) => void;
+  onEditDeal?: (dealId: string) => void;
   isLoading?: boolean;
+  isAdmin?: boolean;
 }
 
 function DealCardSkeleton() {
@@ -31,7 +33,9 @@ export default function DealsGrid({
   title = "הדילים הפעילים עכשיו",
   onJoinDeal,
   onViewDeal,
+  onEditDeal,
   isLoading = false,
+  isAdmin = false,
 }: DealsGridProps) {
   return (
     <section className="py-12 md:py-16" data-testid="deals-grid-section">
@@ -60,6 +64,8 @@ export default function DealsGrid({
                 deal={deal} 
                 onJoin={onJoinDeal}
                 onView={onViewDeal}
+                isAdmin={isAdmin}
+                onEdit={onEditDeal}
               />
             ))
           )}

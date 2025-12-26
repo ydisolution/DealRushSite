@@ -38,11 +38,38 @@ interface TierUnlockedMessage {
   discountPercent: number;
 }
 
+interface DealPendingApprovalMessage {
+  type: "deal_pending_approval";
+  dealId: string;
+  dealName: string;
+  supplierName: string;
+  supplierId: string;
+}
+
+interface DealApprovedMessage {
+  type: "deal_approved";
+  dealId: string;
+  dealName: string;
+  supplierId: string;
+}
+
+interface DealRejectedMessage {
+  type: "deal_rejected";
+  dealId: string;
+  dealName: string;
+  supplierId: string;
+  rejectionReason: string;
+  adminNotes?: string;
+}
+
 type NotificationMessage = 
   | ParticipantJoinedMessage
   | DealCancelledMessage
   | DealClosedMessage
-  | TierUnlockedMessage;
+  | TierUnlockedMessage
+  | DealPendingApprovalMessage
+  | DealApprovedMessage
+  | DealRejectedMessage;
 
 class NotificationService {
   private wss: WebSocketServer | null = null;

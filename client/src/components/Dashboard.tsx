@@ -1,9 +1,20 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { 
   TrendingDown, 
   Package, 
@@ -14,12 +25,15 @@ import {
   LogOut,
   ChevronLeft,
   Truck,
-  Eye
+  Eye,
+  Edit,
+  Trash2
 } from "lucide-react";
 import CountdownTimer from "./CountdownTimer";
 
 interface UserDeal {
   id: string;
+  participantId?: string;
   productName: string;
   productImage: string;
   status: "active" | "completed" | "shipped";
@@ -30,12 +44,14 @@ interface UserDeal {
   savedAmount: number;
   shippingStatus?: string;
   trackingNumber?: string;
+  quantity?: number;
 }
 
 interface DashboardProps {
   user: {
     name: string;
     email: string;
+    phone?: string;
     totalSaved: number;
     totalOrders: number;
     avgDiscount: number;
@@ -49,6 +65,8 @@ interface DashboardProps {
   }>;
   onViewDeal?: (dealId: string) => void;
   onLogout?: () => void;
+  onUpdateQuantity?: (participantId: string, quantity: number) => Promise<void>;
+  onCancelParticipation?: (participantId: string) => Promise<void>;
 }
 
 export default function Dashboard({ 
@@ -56,13 +74,54 @@ export default function Dashboard({
   deals, 
   notifications,
   onViewDeal,
-  onLogout 
+  onLogout,
+  onUpdateQuantity,
+  onCancelParticipation
 }: DashboardProps) {
   const [activeTab, setActiveTab] = useState("active");
+  const [editingDeal, setEditingDeal] = useState<string | null>(null);
+  const [newQuantity, setNewQuantity] = useState<number>(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [dealToCancel, setDealToCancel] = useState<UserDeal | null>(null);
 
   const activeDeals = deals.filter(d => d.status === "active");
   const completedDeals = deals.filter(d => d.status === "completed" || d.status === "shipped");
   const unreadNotifications = notifications.filter(n => !n.read).length;
+
+  const handleEditQuantity = async (participantId: string, quantity: number) => {
+    if (!onUpdateQuantity) return;
+    
+    setIsLoading(true);
+    try {
+      await onUpdateQuantity(participantId, quantity);
+      setEditingDeal(null);
+    } catch (error) {
+      console.error("Error updating quantity:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelParticipation = async (deal: UserDeal) => {
+    if (!onCancelParticipation || !deal.participantId) return;
+    
+    setIsLoading(true);
+    try {
+      await onCancelParticipation(deal.participantId);
+      setCancelDialogOpen(false);
+      setDealToCancel(null);
+    } catch (error) {
+      console.error("Error canceling participation:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openCancelDialog = (deal: UserDeal) => {
+    setDealToCancel(deal);
+    setCancelDialogOpen(true);
+  };
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('he-IL', {
@@ -73,7 +132,7 @@ export default function Dashboard({
   };
 
   return (
-    <div className="min-h-screen bg-muted/30" data-testid="dashboard">
+    <div className="min-h-screen bg-muted/30" data-testid="dashboard" dir="rtl">
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
@@ -85,9 +144,16 @@ export default function Dashboard({
             <div>
               <h1 className="text-2xl font-bold">שלום, {user.name}!</h1>
               <p className="text-muted-foreground">{user.email}</p>
+              {user.phone && <p className="text-sm text-muted-foreground">טלפון: {user.phone}</p>}
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/my-orders">
+              <Button variant="outline" className="gap-2">
+                <Package className="h-4 w-4" />
+                ההזמנות שלי
+              </Button>
+            </Link>
             <Button variant="outline" size="icon" className="relative" data-testid="button-notifications">
               <Bell className="h-4 w-4" />
               {unreadNotifications > 0 && (
@@ -225,16 +291,73 @@ export default function Dashboard({
                                 </span>
                               )}
                             </div>
+                            {deal.quantity && deal.quantity > 1 && (
+                              <div>
+                                <span className="text-muted-foreground">כמות: </span>
+                                <span className="font-bold">{deal.quantity}</span>
+                              </div>
+                            )}
                           </div>
+                          {editingDeal === deal.participantId && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <Input
+                                type="number"
+                                min="1"
+                                value={newQuantity}
+                                onChange={(e) => setNewQuantity(Number(e.target.value))}
+                                className="w-24"
+                              />
+                              <Button
+                                size="sm"
+                                onClick={() => deal.participantId && handleEditQuantity(deal.participantId, newQuantity)}
+                                disabled={isLoading}
+                              >
+                                שמור
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditingDeal(null)}
+                                disabled={isLoading}
+                              >
+                                ביטול
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                        <Button 
-                          variant="outline" 
-                          className="gap-2"
-                          onClick={() => onViewDeal?.(deal.id)}
-                        >
-                          <Eye className="h-4 w-4" />
-                          צפה בדיל
-                        </Button>
+                        <div className="flex flex-col gap-2">
+                          <Button 
+                            variant="outline" 
+                            className="gap-2"
+                            onClick={() => onViewDeal?.(deal.id)}
+                          >
+                            <Eye className="h-4 w-4" />
+                            צפה בדיל
+                          </Button>
+                          {deal.participantId && editingDeal !== deal.participantId && (
+                            <>
+                              <Button
+                                variant="outline"
+                                className="gap-2"
+                                onClick={() => {
+                                  setEditingDeal(deal.participantId!);
+                                  setNewQuantity(deal.quantity || 1);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                                ערוך כמות
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                className="gap-2"
+                                onClick={() => openCancelDialog(deal)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                בטל רישום
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -355,6 +478,36 @@ export default function Dashboard({
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Dialog for cancel confirmation */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ביטול רישום לדיל</DialogTitle>
+            <DialogDescription>
+              האם אתה בטוח שברצונך לבטל את ההרשמה לדיל "{dealToCancel?.productName}"?
+              <br />
+              <span className="text-destructive font-medium">פעולה זו אינה ניתנת לביטול!</span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelDialogOpen(false)}
+              disabled={isLoading}
+            >
+              ביטול
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => dealToCancel && handleCancelParticipation(dealToCancel)}
+              disabled={isLoading}
+            >
+              {isLoading ? "מבטל..." : "אשר ביטול"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

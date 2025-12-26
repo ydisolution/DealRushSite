@@ -1,0 +1,424 @@
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Mail, Lock, User, Phone, ArrowRight, Zap } from "lucide-react";
+import { SiGoogle, SiFacebook } from "react-icons/si";
+import { useQuery } from "@tanstack/react-query";
+
+interface AuthModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  defaultTab?: "login" | "register";
+}
+
+export default function AuthModal({ isOpen, onClose, defaultTab = "login" }: AuthModalProps) {
+  const [activeView, setActiveView] = useState<"login" | "register" | "forgot-password">(defaultTab);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [error, setError] = useState("");
+  
+  const { login, register, forgotPassword, isLoginPending, isRegisterPending } = useAuth();
+  const { toast } = useToast();
+
+  const resetForm = () => {
+    setEmail("");
+    setPassword("");
+    setConfirmPassword("");
+    setFirstName("");
+    setLastName("");
+    setPhone("");
+    setError("");
+  };
+
+  useEffect(() => {
+    setActiveView(defaultTab);
+  }, [defaultTab, isOpen]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    try {
+      await login({ email, password });
+      toast({
+        title: "התחברת בהצלחה!",
+        description: "ברוכים הבאים חזרה",
+      });
+      resetForm();
+      onClose();
+    } catch (err: any) {
+      const errorData = await err?.response?.json?.().catch(() => ({}));
+      setError(errorData?.error || "המייל או הסיסמא שגויים");
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (password !== confirmPassword) {
+      setError("הסיסמאות אינן תואמות");
+      return;
+    }
+    if (password.length < 8) {
+      setError("הסיסמא חייבת להכיל לפחות 8 תווים");
+      return;
+    }
+
+    try {
+      await register({ email, password, firstName, lastName, phone });
+      toast({
+        title: "נרשמת בהצלחה!",
+        description: "נשלח אליך מייל לאימות הכתובת",
+      });
+      resetForm();
+      onClose();
+    } catch (err: any) {
+      const errorData = await err?.response?.json?.().catch(() => ({}));
+      setError(errorData?.error || "אירעה שגיאה בהרשמה");
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    try {
+      await forgotPassword(email);
+      toast({
+        title: "נשלח מייל",
+        description: "אם המייל קיים במערכת, ישלח אליו קישור לאיפוס הסיסמא",
+      });
+      setActiveView("login");
+      resetForm();
+    } catch (err: any) {
+      setError("אירעה שגיאה בשליחת המייל");
+    }
+  };
+
+  const { data: providers } = useQuery<{ google: boolean; facebook: boolean }>({
+    queryKey: ["/api/auth/providers"],
+  });
+
+  const handleGoogleLogin = () => {
+    window.location.href = "/api/auth/google";
+  };
+
+  const handleFacebookLogin = () => {
+    window.location.href = "/api/auth/facebook";
+  };
+
+  const SocialLoginButtons = () => {
+    const hasProviders = providers?.google || providers?.facebook;
+    
+    if (!hasProviders) {
+      return null;
+    }
+    
+    return (
+      <div className="space-y-3">
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-gray-200" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-3 text-gray-500 font-medium">
+              או
+            </span>
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          {providers?.google && (
+            <Button 
+              type="button"
+              variant="outline" 
+              className="w-full h-11 flex items-center justify-center gap-3 rounded-xl border-gray-200 hover:bg-gray-50 font-medium"
+              onClick={handleGoogleLogin}
+              data-testid="button-social-google"
+            >
+              <SiGoogle className="h-4 w-4 text-gray-700" />
+              <span className="text-gray-700">התחבר עם Google</span>
+            </Button>
+          )}
+          {providers?.facebook && (
+            <Button 
+              type="button"
+              variant="outline" 
+              className="w-full h-11 flex items-center justify-center gap-3 rounded-xl border-gray-200 hover:bg-gray-50 font-medium"
+              onClick={handleFacebookLogin}
+              data-testid="button-social-facebook"
+            >
+              <SiFacebook className="h-4 w-4 text-blue-600" />
+              <span className="text-gray-700">התחבר עם Apple</span>
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const getTitle = () => {
+    switch (activeView) {
+      case "forgot-password":
+        return "שחזור סיסמא";
+      case "register":
+        return "הרשמה ל-DealRush";
+      case "login":
+      default:
+        return "התחברות ל-DealRush";
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md border-0 shadow-2xl p-0 gap-0 overflow-hidden" dir="rtl" data-testid="auth-modal">
+        {/* Header with Gradient Background */}
+        <div className="bg-gradient-to-br from-[#7B2FF7] to-purple-600 p-5 pb-3 text-center">
+          <div className="flex justify-center mb-1.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg">
+              <Zap className="h-6 w-6 text-[#7B2FF7]" />
+            </div>
+          </div>
+          <DialogTitle className="text-center text-lg font-bold text-white mb-0.5">
+            {activeView === "forgot-password" ? "שחזור סיסמא" : activeView === "register" ? "ברוכים הבאים ל-DealRush" : "ברוכים הבאים בחזרה"}
+          </DialogTitle>
+          <p className="text-purple-100 text-[11px]">
+            {activeView === "forgot-password" ? "נשלח לך קישור לאיפוס הסיסמא" : activeView === "register" ? "הירשם והתחל לחסוך עכשיו" : "התחבר כדי להמשיך"}
+          </p>
+          <DialogDescription className="sr-only">
+            {activeView === "login" ? "התחבר לחשבון שלך" : activeView === "register" ? "צור חשבון חדש" : "שחזר את הסיסמא שלך"}
+          </DialogDescription>
+        </div>
+
+        {/* Content Area */}
+        <div className="p-5 pt-3">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-2 rounded-lg text-center mb-2">
+              {error}
+            </div>
+          )}
+
+          {activeView === "forgot-password" && (
+            <form onSubmit={handleForgotPassword} className="space-y-2.5">
+              <div className="space-y-1">
+                <Label htmlFor="forgot-email" className="text-xs font-medium text-gray-700">כתובת מייל</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-11 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
+                  required
+                  data-testid="input-forgot-email"
+                />
+              </div>
+
+              <Button 
+                type="submit" 
+                className="w-full h-11 rounded-xl bg-black hover:bg-gray-900 text-white font-medium"
+                data-testid="button-forgot-submit"
+              >
+                שלח קישור לאיפוס
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => setActiveView("login")}
+                className="text-[#7B2FF7] hover:text-purple-700 flex items-center justify-center gap-1 w-full text-sm font-medium"
+                data-testid="link-back-to-login"
+              >
+                חזרה להתחברות
+              </button>
+            </form>
+          )}
+
+          {activeView === "login" && (
+            <div className="space-y-3">
+              <form onSubmit={handleLogin} className="space-y-2.5">
+                <div className="space-y-1">
+                  <Label htmlFor="login-email" className="text-xs font-medium text-gray-700">שם משתמש או אימייל</Label>
+                  <Input 
+                    id="login-email"
+                    type="email"
+                    placeholder="name@example.com"
+                    className="h-11 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    data-testid="input-login-email"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="login-password" className="text-xs font-medium text-gray-700">סיסמה</Label>
+                  <Input 
+                    id="login-password"
+                    type="password"
+                    placeholder="הכנס סיסמה"
+                    className="h-11 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    data-testid="input-login-password"
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full h-11 rounded-xl bg-black hover:bg-gray-900 text-white font-medium"
+                  disabled={isLoginPending}
+                  data-testid="button-submit-login"
+                >
+                  {isLoginPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                      מתחבר...
+                    </>
+                  ) : "התחברות"}
+                </Button>
+              </form>
+
+              <SocialLoginButtons />
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setActiveView("forgot-password")}
+                  className="text-sm text-gray-600 hover:text-[#7B2FF7]"
+                  data-testid="button-forgot-password"
+                >
+                  שכחת סיסמה?
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeView === "register" && (
+            <div className="space-y-3">
+              <form onSubmit={handleRegister} className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="register-firstName" className="text-xs font-medium text-gray-700">שם פרטי</Label>
+                    <Input 
+                      id="register-firstName"
+                      placeholder="ישראל"
+                      className="h-11 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      data-testid="input-register-firstName"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="register-lastName" className="text-xs font-medium text-gray-700">שם משפחה</Label>
+                    <Input 
+                      id="register-lastName"
+                      placeholder="ישראלי"
+                      className="h-11 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      data-testid="input-register-lastName"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="register-email" className="text-xs font-medium text-gray-700">אימייל</Label>
+                  <Input 
+                    id="register-email"
+                    type="email"
+                    placeholder="name@example.com"
+                    className="h-11 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    data-testid="input-register-email"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="register-phone" className="text-xs font-medium text-gray-700">טלפון (אופציונלי)</Label>
+                  <Input 
+                    id="register-phone"
+                    type="tel"
+                    placeholder="050-1234567"
+                    className="h-11 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    data-testid="input-register-phone"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="register-password" className="text-xs font-medium text-gray-700">סיסמה (8+ תווים)</Label>
+                  <Input 
+                    id="register-password"
+                    type="password"
+                    placeholder="הכנס סיסמה"
+                    className="h-11 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    data-testid="input-register-password"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="register-confirmPassword" className="text-xs font-medium text-gray-700">אימות סיסמה</Label>
+                  <Input 
+                    id="register-confirmPassword"
+                    type="password"
+                    placeholder="הכנס סיסמה שוב"
+                    className="h-11 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    data-testid="input-register-confirmPassword"
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full h-11 rounded-xl bg-black hover:bg-gray-900 text-white font-medium"
+                  disabled={isRegisterPending}
+                  data-testid="button-submit-register"
+                >
+                  {isRegisterPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                      יוצר חשבון...
+                    </>
+                  ) : "הרשמה"}
+                </Button>
+                <p className="text-[10px] text-center text-gray-500">
+                  בהרשמה אתם מסכימים לתנאי השימוש ומדיניות הפרטיות
+                </p>
+              </form>
+
+              <SocialLoginButtons />
+            </div>
+          )}
+
+          {/* Toggle between Login/Register */}
+          {activeView !== "forgot-password" && (
+            <div className="mt-3 text-center">
+              <p className="text-sm text-gray-600">
+                {activeView === "login" ? "אין לך חשבון? " : "כבר יש לך חשבון? "}
+                <button
+                  type="button"
+                  onClick={() => setActiveView(activeView === "login" ? "register" : "login")}
+                  className="text-[#7B2FF7] hover:text-purple-700 font-semibold"
+                >
+                  {activeView === "login" ? "הירשם חינם" : "התחבר"}
+                </button>
+              </p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

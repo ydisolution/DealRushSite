@@ -212,18 +212,24 @@ export async function setupSocialAuth(app: Express) {
 
 export async function createAdminUser() {
   const adminEmail = "admin@dealrush.co.il";
-  const adminPassword = "DealRush2024!";
+  const adminPassword = "A";  // Changed to simple password for development
   
   const passwordHash = await hashPassword(adminPassword);
   
   const existingAdmin = await storage.getUserByEmail(adminEmail);
   if (existingAdmin) {
-    await storage.updateUser(existingAdmin.id, {
-      passwordHash,
-      isAdmin: "true",
-      isEmailVerified: "true",
-    });
-    console.log("Admin user password updated:", adminEmail);
+    // Only update if admin doesn't have a password yet
+    if (!existingAdmin.passwordHash) {
+      await storage.updateUser(existingAdmin.id, {
+        passwordHash,
+        isAdmin: "true",
+        isEmailVerified: "true",
+      });
+      console.log("✅ Admin user password set:", adminEmail);
+      console.log("🔑 Admin password:", adminPassword);
+    } else {
+      console.log("✅ Admin user exists:", adminEmail);
+    }
     return existingAdmin;
   }
   
@@ -236,27 +242,33 @@ export async function createAdminUser() {
     isEmailVerified: "true",
   });
   
-  console.log("Admin user created:", adminEmail);
-  console.log("Admin password:", adminPassword);
+  console.log("✅ Admin user created:", adminEmail);
+  console.log("🔑 Admin password:", adminPassword);
   
   return admin;
 }
 
 export async function createSupplierUser() {
   const supplierEmail = "dreamer@dealrush.co.il";
-  const supplierPassword = "Aa123456!";
+  const supplierPassword = "A";  // Changed to simple password for development
   
   const passwordHash = await hashPassword(supplierPassword);
   
   const existingSupplier = await storage.getUserByEmail(supplierEmail);
   if (existingSupplier) {
-    await storage.updateUser(existingSupplier.id, {
-      passwordHash,
-      isSupplier: "true",
-      isEmailVerified: "true",
-      supplierCompanyName: "Dreamer Supplies",
-    });
-    console.log("Supplier user 'Dreamer' password updated:", supplierEmail);
+    // Only update if supplier doesn't have a password yet
+    if (!existingSupplier.passwordHash) {
+      await storage.updateUser(existingSupplier.id, {
+        passwordHash,
+        isSupplier: "true",
+        isEmailVerified: "true",
+        supplierCompanyName: "Dreamer Supplies",
+      });
+      console.log("✅ Supplier user 'Dreamer' password set:", supplierEmail);
+      console.log("🔑 Supplier password:", supplierPassword);
+    } else {
+      console.log("✅ Supplier user exists:", supplierEmail);
+    }
     return existingSupplier;
   }
   
@@ -270,7 +282,8 @@ export async function createSupplierUser() {
     supplierCompanyName: "Dreamer Supplies",
   });
   
-  console.log("Supplier user 'Dreamer' created:", supplierEmail);
+  console.log("✅ Supplier user 'Dreamer' created:", supplierEmail);
+  console.log("🔑 Supplier password:", supplierPassword);
   
   return supplier;
 }

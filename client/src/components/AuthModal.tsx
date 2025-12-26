@@ -124,41 +124,41 @@ export default function AuthModal({ isOpen, onClose, defaultTab = "login" }: Aut
     }
     
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
+            <span className="w-full border-t border-gray-200" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">
-              או המשך עם
+            <span className="bg-white px-3 text-gray-500 font-medium">
+              או
             </span>
           </div>
         </div>
         
-        <div className={`grid gap-3 ${providers?.google && providers?.facebook ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        <div className="space-y-2">
           {providers?.google && (
             <Button 
               type="button"
               variant="outline" 
-              className="w-full flex items-center gap-2"
+              className="w-full h-9 flex items-center justify-center gap-2 rounded-lg border-gray-200 hover:bg-gray-50 font-medium"
               onClick={handleGoogleLogin}
               data-testid="button-social-google"
             >
-              <SiGoogle className="h-4 w-4" />
-              <span>Google</span>
+              <SiGoogle className="h-4 w-4 text-gray-700" />
+              <span className="text-gray-700">התחבר עם Google</span>
             </Button>
           )}
           {providers?.facebook && (
             <Button 
               type="button"
               variant="outline" 
-              className="w-full flex items-center gap-2"
+              className="w-full h-9 flex items-center justify-center gap-2 rounded-lg border-gray-200 hover:bg-gray-50 font-medium"
               onClick={handleFacebookLogin}
               data-testid="button-social-facebook"
             >
-              <SiFacebook className="h-4 w-4" />
-              <span>Facebook</span>
+              <SiFacebook className="h-4 w-4 text-blue-600" />
+              <span className="text-gray-700">התחבר עם Apple</span>
             </Button>
           )}
         </div>
@@ -180,196 +180,186 @@ export default function AuthModal({ isOpen, onClose, defaultTab = "login" }: Aut
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md" dir="rtl" data-testid="auth-modal">
-        <DialogHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary">
-              <Zap className="h-7 w-7 text-primary-foreground" />
+      <DialogContent className="sm:max-w-md border-0 shadow-2xl p-0 gap-0 overflow-hidden" dir="rtl" data-testid="auth-modal">
+        {/* Header with Gradient Background */}
+        <div className="bg-gradient-to-br from-[#7B2FF7] to-purple-600 p-4 pb-2.5 text-center">
+          <div className="flex justify-center mb-1.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-lg">
+              <Zap className="h-5 w-5 text-[#7B2FF7]" />
             </div>
           </div>
-          <DialogTitle className="text-center text-xl">
-            {getTitle()}
+          <DialogTitle className="text-center text-base font-bold text-white mb-0.5">
+            {activeView === "forgot-password" ? "שחזור סיסמא" : activeView === "register" ? "ברוכים הבאים ל-DealRush" : "ברוכים הבאים בחזרה"}
           </DialogTitle>
+          <p className="text-purple-100 text-[11px]">
+            {activeView === "forgot-password" ? "נשלח לך קישור לאיפוס הסיסמא" : activeView === "register" ? "הירשם והתחל לחסוך עכשיו" : "התחבר כדי להמשיך"}
+          </p>
           <DialogDescription className="sr-only">
             {activeView === "login" ? "התחבר לחשבון שלך" : activeView === "register" ? "צור חשבון חדש" : "שחזר את הסיסמא שלך"}
           </DialogDescription>
-        </DialogHeader>
-        
-        {error && (
-          <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md text-center">
-            {error}
-          </div>
-        )}
+        </div>
 
-        {activeView === "forgot-password" && (
-          <form onSubmit={handleForgotPassword} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="forgot-email">כתובת מייל</Label>
-              <div className="relative">
-                <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        {/* Content Area */}
+        <div className="p-5 pt-3">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-2 rounded-lg text-center mb-2">
+              {error}
+            </div>
+          )}
+
+          {activeView === "forgot-password" && (
+            <form onSubmit={handleForgotPassword} className="space-y-1.5">
+              <div className="space-y-1">
+                <Label htmlFor="forgot-email" className="text-xs font-medium text-gray-700">כתובת מייל</Label>
                 <Input
                   id="forgot-email"
                   type="email"
-                  placeholder="example@email.com"
+                  placeholder="name@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pr-10"
+                  className="h-9 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
                   required
                   data-testid="input-forgot-email"
                 />
               </div>
-            </div>
 
-            <Button type="submit" className="w-full" data-testid="button-forgot-submit">
-              שלח קישור לאיפוס
-            </Button>
+              <Button 
+                type="submit" 
+                className="w-full h-9 rounded-xl bg-black hover:bg-gray-900 text-white font-medium"
+                data-testid="button-forgot-submit"
+              >
+                שלח קישור לאיפוס
+              </Button>
 
-            <button
-              type="button"
-              onClick={() => setActiveView("login")}
-              className="text-primary hover:underline flex items-center justify-center gap-1 w-full text-sm"
-              data-testid="link-back-to-login"
-            >
-              <ArrowRight className="h-4 w-4" />
-              חזרה להתחברות
-            </button>
-          </form>
-        )}
+              <button
+                type="button"
+                onClick={() => setActiveView("login")}
+                className="text-[#7B2FF7] hover:text-purple-700 flex items-center justify-center gap-1 w-full text-xs font-medium"
+                data-testid="link-back-to-login"
+              >
+                חזרה להתחברות
+              </button>
+            </form>
+          )}
 
-        {activeView === "login" && (
-          <div className="space-y-4">
-            <SocialLoginButtons />
-            
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="login-email">אימייל</Label>
-                <div className="relative">
-                  <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          {activeView === "login" && (
+            <div className="space-y-2">
+              <form onSubmit={handleLogin} className="space-y-1.5">
+                <div className="space-y-1">
+                  <Label htmlFor="login-email" className="text-xs font-medium text-gray-700">שם משתמש או אימייל</Label>
                   <Input 
                     id="login-email"
                     type="email"
-                    placeholder="example@email.com"
-                    className="pr-10"
+                    placeholder="name@example.com"
+                    className="h-9 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     data-testid="input-login-email"
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="login-password">סיסמה</Label>
-                <div className="relative">
-                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="login-password" className="text-xs font-medium text-gray-700">סיסמה</Label>
                   <Input 
                     id="login-password"
                     type="password"
-                    placeholder="********"
-                    className="pr-10"
+                    placeholder="הכנס סיסמה"
+                    className="h-9 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     data-testid="input-login-password"
                   />
                 </div>
-              </div>
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isLoginPending}
-                data-testid="button-submit-login"
-              >
-                {isLoginPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                    מתחבר...
-                  </>
-                ) : "התחברות"}
-              </Button>
-              <Button 
-                type="button" 
-                variant="ghost" 
-                className="w-full text-sm"
-                onClick={() => setActiveView("forgot-password")}
-                data-testid="button-forgot-password"
-              >
-                שכחתי סיסמה
-              </Button>
-            </form>
-          </div>
-        )}
+                <Button 
+                  type="submit" 
+                  className="w-full h-9 rounded-xl bg-black hover:bg-gray-900 text-white font-medium"
+                  disabled={isLoginPending}
+                  data-testid="button-submit-login"
+                >
+                  {isLoginPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                      מתחבר...
+                    </>
+                  ) : "התחברות"}
+                </Button>
+              </form>
 
-        {activeView === "register" && (
-          <div className="space-y-4">
-            <SocialLoginButtons />
-            
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="register-firstName">שם פרטי</Label>
-                  <div className="relative">
-                    <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <SocialLoginButtons />
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setActiveView("forgot-password")}
+                  className="text-xs text-gray-600 hover:text-[#7B2FF7]"
+                  data-testid="button-forgot-password"
+                >
+                  שכחת סיסמה?
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeView === "register" && (
+            <div className="space-y-2">
+              <form onSubmit={handleRegister} className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="register-firstName" className="text-xs font-medium text-gray-700">שם פרטי</Label>
                     <Input 
                       id="register-firstName"
                       placeholder="ישראל"
-                      className="pr-10"
+                      className="h-9 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       data-testid="input-register-firstName"
                     />
                   </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="register-lastName" className="text-xs font-medium text-gray-700">שם משפחה</Label>
+                    <Input 
+                      id="register-lastName"
+                      placeholder="ישראלי"
+                      className="h-9 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      data-testid="input-register-lastName"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="register-lastName">שם משפחה</Label>
-                  <Input 
-                    id="register-lastName"
-                    placeholder="ישראלי"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    data-testid="input-register-lastName"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-email">אימייל</Label>
-                <div className="relative">
-                  <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="register-email" className="text-xs font-medium text-gray-700">אימייל</Label>
                   <Input 
                     id="register-email"
                     type="email"
-                    placeholder="example@email.com"
-                    className="pr-10"
+                    placeholder="name@example.com"
+                    className="h-9 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     data-testid="input-register-email"
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-phone">טלפון (אופציונלי)</Label>
-                <div className="relative">
-                  <Phone className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="register-phone" className="text-xs font-medium text-gray-700">טלפון (אופציונלי)</Label>
                   <Input 
                     id="register-phone"
                     type="tel"
                     placeholder="050-1234567"
-                    className="pr-10"
+                    className="h-9 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     data-testid="input-register-phone"
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-password">סיסמה (לפחות 8 תווים)</Label>
-                <div className="relative">
-                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="register-password" className="text-xs font-medium text-gray-700">סיסמה (8+ תווים)</Label>
                   <Input 
                     id="register-password"
                     type="password"
-                    placeholder="********"
-                    className="pr-10"
+                    placeholder="הכנס סיסמה"
+                    className="h-9 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -377,42 +367,57 @@ export default function AuthModal({ isOpen, onClose, defaultTab = "login" }: Aut
                     data-testid="input-register-password"
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-confirmPassword">אימות סיסמה</Label>
-                <div className="relative">
-                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="register-confirmPassword" className="text-xs font-medium text-gray-700">אימות סיסמה</Label>
                   <Input 
                     id="register-confirmPassword"
                     type="password"
-                    placeholder="********"
-                    className="pr-10"
+                    placeholder="הכנס סיסמה שוב"
+                    className="h-9 rounded-xl border-gray-200 focus:border-[#7B2FF7] focus:ring-[#7B2FF7]"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                     data-testid="input-register-confirmPassword"
                   />
                 </div>
-              </div>
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isRegisterPending}
-                data-testid="button-submit-register"
-              >
-                {isRegisterPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin ml-2" />
-                    יוצר חשבון...
-                  </>
-                ) : "הרשמה"}
-              </Button>
-              <p className="text-xs text-center text-muted-foreground">
-                בהרשמה אתם מסכימים לתנאי השימוש ומדיניות הפרטיות
+                <Button 
+                  type="submit" 
+                  className="w-full h-9 rounded-xl bg-black hover:bg-gray-900 text-white font-medium"
+                  disabled={isRegisterPending}
+                  data-testid="button-submit-register"
+                >
+                  {isRegisterPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                      יוצר חשבון...
+                    </>
+                  ) : "הרשמה"}
+                </Button>
+                <p className="text-[10px] text-center text-gray-500">
+                  בהרשמה אתם מסכימים לתנאי השימוש ומדיניות הפרטיות
+                </p>
+              </form>
+
+              <SocialLoginButtons />
+            </div>
+          )}
+
+          {/* Toggle between Login/Register */}
+          {activeView !== "forgot-password" && (
+            <div className="mt-3 text-center">
+              <p className="text-xs text-gray-600">
+                {activeView === "login" ? "אין לך חשבון? " : "כבר יש לך חשבון? "}
+                <button
+                  type="button"
+                  onClick={() => setActiveView(activeView === "login" ? "register" : "login")}
+                  className="text-[#7B2FF7] hover:text-purple-700 font-semibold"
+                >
+                  {activeView === "login" ? "הירשם חינם" : "התחבר"}
+                </button>
               </p>
-            </form>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

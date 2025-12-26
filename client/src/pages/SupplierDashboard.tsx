@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +25,8 @@ import {
   Send,
   Settings
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import CompletedDealsAnalytics from "@/components/CompletedDealsAnalytics";
 
 interface DealAggregates {
   totalUnits: number;
@@ -55,9 +59,21 @@ interface DealCustomer {
   phone: string | null;
   unitsPurchased: number;
   unitPricePaid: number;
+  totalPaid: number;
   purchasedAt: Date;
   paymentStatus: string | null;
   chargedAmount: number | null;
+  needsShipping: boolean | null;
+  shippingAddress: string | null;
+  shippingCity: string | null;
+  shippingZipCode: string | null;
+  shippingCost: number;
+  units: Array<{
+    id: string;
+    position: number;
+    pricePaid: number;
+    quantity: number;
+  }>;
 }
 
 interface DealDetails extends SupplierDeal {
@@ -104,8 +120,66 @@ function formatDate(dateString: string): string {
 }
 
 export default function SupplierDashboard() {
+  const { isAuthenticated, isSupplier, isLoading: authLoading, user } = useAuth();
+  const [, setLocation] = useLocation();
   const [selectedDeal, setSelectedDeal] = useState<DealDetails | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const { toast } = useToast();
+
+  // WebSocket listener for deal approval/rejection notifications
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      
+      if (message.type === "deal_approved" && message.supplierId === user.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/suppliers/deals"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/suppliers/stats"] });
+        toast({
+          title: "הדיל אושר! 🎉",
+          description: `הדיל "${message.dealName}" אושר והועלה לאוויר`,
+        });
+      } else if (message.type === "deal_rejected" && message.supplierId === user.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/suppliers/deals"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/suppliers/stats"] });
+        toast({
+          title: "הדיל נדחה",
+          description: `הדיל "${message.dealName}" נדחה. ${message.rejectionReason}`,
+          variant: "destructive",
+        });
+      }
+    };
+    
+    return () => ws.close();
+  }, [user?.id, toast]);
+
+  // Check authentication and supplier status
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !isSupplier) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center" dir="rtl">
+        <div className="max-w-md mx-auto">
+          <AlertCircle className="w-16 h-16 mx-auto mb-4 text-destructive" />
+          <h1 className="text-2xl font-bold mb-4">גישה נדחתה</h1>
+          <p className="text-muted-foreground mb-6">רק ספקים יכולים לגשת לדף זה</p>
+          <Button onClick={() => setLocation('/')}>
+            חזרה לדף הבית
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const { data: stats, isLoading: statsLoading } = useQuery<SupplierStats>({
     queryKey: ["/api/suppliers/stats"],
@@ -129,7 +203,7 @@ export default function SupplierDashboard() {
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 py-8 max-w-7xl" dir="rtl">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold">דשבורד ספק</h1>
@@ -139,6 +213,12 @@ export default function SupplierDashboard() {
             <Link href="/supplier-settings">
               <Button variant="outline" size="icon" data-testid="button-supplier-settings" title="הגדרות ספק">
                 <Settings className="h-5 w-5" />
+              </Button>
+            </Link>
+            <Link href="/supplier/orders">
+              <Button variant="outline" data-testid="button-supplier-orders">
+                <Package className="h-4 w-4 ml-2" />
+                ניהול הזמנות
               </Button>
             </Link>
             <Link href="/supplier/deals/new">
@@ -258,18 +338,25 @@ export default function SupplierDashboard() {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              הדילים שלי
-            </CardTitle>
-            <CardDescription>
-              כל הדילים שיצרת ופרטי הביצועים שלהם
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
+        <Tabs defaultValue="active" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="active">דילים פעילים</TabsTrigger>
+            <TabsTrigger value="completed">ניתוח דילים שהסתיימו</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="active">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  הדילים שלי
+                </CardTitle>
+                <CardDescription>
+                  כל הדילים שיצרת ופרטי הביצועים שלהם
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
               <div className="text-center py-8 text-muted-foreground">טוען נתונים...</div>
             ) : deals.length === 0 ? (
               <div className="text-center py-12">
@@ -393,38 +480,76 @@ export default function SupplierDashboard() {
                   </h3>
                   
                   {dealDetails.customers && dealDetails.customers.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-right">שם</TableHead>
-                          <TableHead className="text-right">אימייל</TableHead>
-                          <TableHead className="text-right">טלפון</TableHead>
-                          <TableHead className="text-right">יחידות</TableHead>
-                          <TableHead className="text-right">מחיר ליחידה</TableHead>
-                          <TableHead className="text-right">סטטוס תשלום</TableHead>
-                          <TableHead className="text-right">תאריך רכישה</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {dealDetails.customers.map((customer) => (
-                          <TableRow key={customer.id}>
-                            <TableCell>{customer.name}</TableCell>
-                            <TableCell>{customer.email || "-"}</TableCell>
-                            <TableCell dir="ltr" className="text-right">{customer.phone || "-"}</TableCell>
-                            <TableCell>{customer.unitsPurchased}</TableCell>
-                            <TableCell>{formatCurrency(customer.unitPricePaid)}</TableCell>
-                            <TableCell>
-                              <Badge variant={customer.paymentStatus === "charged" ? "default" : "secondary"}>
-                                {customer.paymentStatus === "charged" ? "שולם" : customer.paymentStatus || "ממתין"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {new Date(customer.purchasedAt).toLocaleDateString("he-IL")}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <div className="space-y-4">
+                      {dealDetails.customers.map((customer) => (
+                        <Card key={customer.id} className="border-2">
+                          <CardContent className="pt-4">
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-lg flex items-center gap-2">
+                                  <Users className="h-4 w-4" />
+                                  פרטי לקוח
+                                </h4>
+                                <div className="space-y-1 text-sm">
+                                  <p><strong>שם:</strong> {customer.name}</p>
+                                  <p><strong>אימייל:</strong> {customer.email || "-"}</p>
+                                  <p dir="ltr" className="text-right"><strong>טלפון:</strong> {customer.phone || "-"}</p>
+                                  <p><strong>תאריך הזמנה:</strong> {new Date(customer.purchasedAt).toLocaleDateString("he-IL", { 
+                                    year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" 
+                                  })}</p>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-lg flex items-center gap-2">
+                                  <Package className="h-4 w-4" />
+                                  פרטי הזמנה
+                                </h4>
+                                <div className="space-y-1 text-sm">
+                                  <p><strong>יחידות שהוזמנו:</strong> {customer.unitsPurchased}</p>
+                                  <p><strong>מחיר ליחידה:</strong> {formatCurrency(customer.unitPricePaid)}</p>
+                                  <p><strong>סה"כ לתשלום:</strong> <span className="text-lg font-bold text-primary">{formatCurrency(customer.totalPaid)}</span></p>
+                                  <div>
+                                    <strong>סטטוס תשלום:</strong>{" "}
+                                    <Badge variant={customer.paymentStatus === "charged" ? "default" : "secondary"}>
+                                      {customer.paymentStatus === "charged" ? "שולם" : customer.paymentStatus || "ממתין"}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {customer.needsShipping && (
+                              <div className="mt-4 pt-4 border-t">
+                                <h4 className="font-semibold text-lg flex items-center gap-2 mb-2">
+                                  <Package className="h-4 w-4" />
+                                  פרטי משלוח
+                                </h4>
+                                <div className="bg-blue-50 p-3 rounded-lg space-y-1 text-sm">
+                                  <p><strong>כתובת:</strong> {customer.shippingAddress || "-"}</p>
+                                  <p><strong>עיר:</strong> {customer.shippingCity || "-"}</p>
+                                  <p><strong>מיקוד:</strong> {customer.shippingZipCode || "-"}</p>
+                                  <p><strong>עלות משלוח:</strong> {formatCurrency(customer.shippingCost)}</p>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {customer.units.length > 1 && (
+                              <div className="mt-4 pt-4 border-t">
+                                <h4 className="font-semibold text-sm mb-2">פירוט יחידות:</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {customer.units.map((unit) => (
+                                    <Badge key={unit.id} variant="outline">
+                                      מיקום #{unit.position} - {formatCurrency(unit.pricePaid)}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -436,7 +561,41 @@ export default function SupplierDashboard() {
             ) : null}
           </DialogContent>
         </Dialog>
+          </TabsContent>
+
+          <TabsContent value="completed">
+            <SupplierCompletedDealsTab />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
+}
+
+function SupplierCompletedDealsTab() {
+  const { data: closedDeals = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/suppliers/closed-deals"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  const dealsForAnalytics = closedDeals.map((deal: any) => ({
+    id: deal.id,
+    name: deal.name,
+    participants: deal.totalParticipants,
+    totalRevenue: deal.netRevenue, // Use net revenue for supplier (after commission)
+    avgPrice: deal.avgPrice,
+    avgUnitsPerCustomer: deal.avgUnitsPerCustomer,
+    duration: deal.duration,
+    category: deal.category,
+    completionRate: deal.completionRate,
+  }));
+
+  return <CompletedDealsAnalytics deals={dealsForAnalytics} />;
 }

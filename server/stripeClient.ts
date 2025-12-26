@@ -2,7 +2,19 @@ import Stripe from 'stripe';
 
 let connectionSettings: any;
 
-async function getCredentials() {
+async function getCredentials(): Promise<{ publishableKey: string; secretKey: string } | null> {
+  // Fallback to environment variables if not on Replit
+  const stripePublishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  
+  if (stripePublishableKey && stripeSecretKey) {
+    console.log('✅ Using Stripe keys from environment variables');
+    return {
+      publishableKey: stripePublishableKey,
+      secretKey: stripeSecretKey,
+    };
+  }
+
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? 'repl ' + process.env.REPL_IDENTITY
@@ -11,7 +23,8 @@ async function getCredentials() {
       : null;
 
   if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+    console.warn('⚠️  Stripe not configured (no Replit token or environment variables)');
+    return null;
   }
 
   const connectorName = 'stripe';
@@ -45,15 +58,35 @@ async function getCredentials() {
 }
 
 export async function getUncachableStripeClient() {
-  const { secretKey } = await getCredentials();
-  return new Stripe(secretKey, {
-    apiVersion: '2025-08-27.basil',
-  });
+  try {
+    const credentials = await getCredentials();
+    if (!credentials) {
+      console.warn('⚠️  Stripe not configured, using mock client');
+      return null;
+    }
+    return new Stripe(credentials.secretKey, {
+      apiVersion: '2025-08-27.basil',
+    });
+  } catch (error) {
+    console.warn('⚠️  Stripe not configured, using mock client');
+    // Return null for development without Stripe
+    return null;
+  }
 }
 
 export async function getStripePublishableKey() {
-  const { publishableKey } = await getCredentials();
-  return publishableKey;
+  try {
+    const credentials = await getCredentials();
+    if (!credentials) {
+      console.warn('⚠️  Stripe publishable key not configured');
+      return null;
+    }
+    return credentials.publishableKey;
+  } catch (error) {
+    console.warn('⚠️  Stripe publishable key not configured');
+    // Return null for development without Stripe
+    return null;
+  }
 }
 
 export async function getStripeSecretKey() {

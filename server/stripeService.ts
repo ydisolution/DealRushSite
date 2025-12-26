@@ -39,7 +39,7 @@ export class StripeService {
     const stripe = await getUncachableStripeClient();
     return await stripe.paymentIntents.create({
       customer: customerId,
-      amount: Math.round(amount * 100),
+      amount: Math.round(amount), // Amount is already in agorot (smallest currency unit)
       currency,
       metadata,
       automatic_payment_methods: {
@@ -60,7 +60,7 @@ export class StripeService {
     
     return await stripe.paymentIntents.create({
       customer: customerId,
-      amount: Math.round(amount * 100),
+      amount: Math.round(amount), // Amount is already in agorot (smallest currency unit)
       currency,
       payment_method: paymentMethodId,
       off_session: true,
@@ -126,12 +126,64 @@ export class StripeService {
     }
   }
 
-  async refundPayment(paymentIntentId: string, amount?: number) {
+  async refundPayment(
+    paymentIntentId: string, 
+    amount?: number, 
+    reason: 'duplicate' | 'fraudulent' | 'requested_by_customer' = 'requested_by_customer',
+    metadata?: Record<string, string>
+  ) {
     const stripe = await getUncachableStripeClient();
     return await stripe.refunds.create({
       payment_intent: paymentIntentId,
-      amount: amount ? Math.round(amount * 100) : undefined,
+      amount: amount ? Math.round(amount) : undefined, // Amount is already in agorot if provided
+      reason,
+      metadata,
     });
+  }
+
+  async chargeWithRetry(
+    customerId: string,
+    paymentMethodId: string,
+    amount: number,
+    currency: string = 'ils',
+    metadata?: Record<string, string>,
+    maxRetries: number = 3
+  ) {
+    let lastError: any;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`💳 Charge attempt ${attempt}/${maxRetries} for customer ${customerId}`);
+        const paymentIntent = await this.chargePaymentMethod(
+          customerId,
+          paymentMethodId,
+          amount,
+          currency,
+          metadata
+        );
+        console.log(`✅ Charge successful on attempt ${attempt}`);
+        return paymentIntent;
+      } catch (error: any) {
+        lastError = error;
+        console.error(`❌ Charge attempt ${attempt} failed:`, error.message);
+        
+        // Don't retry for certain errors
+        if (error.code === 'card_declined' || 
+            error.code === 'insufficient_funds' ||
+            error.code === 'incorrect_cvc') {
+          throw error;
+        }
+        
+        // Wait before retrying (exponential backoff)
+        if (attempt < maxRetries) {
+          const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+          console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
+    }
+    
+    throw lastError;
   }
 }
 

@@ -44,11 +44,11 @@ export default function DealPage({ onOpenAuth }: DealPageProps) {
   }, [id]);
 
   const { data: deal, isLoading, error } = useQuery<Deal>({
-    queryKey: ["/api/deals", id],
+    queryKey: [`/api/deals/${id}`],
   });
 
   const { data: participants } = useQuery<Participant[]>({
-    queryKey: ["/api/deals", id, "participants"],
+    queryKey: [`/api/deals/${id}/participants`],
     enabled: !!deal,
   });
 

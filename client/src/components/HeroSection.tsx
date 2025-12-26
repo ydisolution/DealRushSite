@@ -23,7 +23,7 @@ export default function HeroSection({
 }: HeroSectionProps) {
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-accent/10 to-background py-20 md:py-28">
+    <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-accent/10 to-background py-20 md:py-28" dir="rtl">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-1/2 -right-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-1/4 -left-1/4 w-80 h-80 bg-accent/20 rounded-full blur-3xl" />

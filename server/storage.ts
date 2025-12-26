@@ -5,10 +5,16 @@ import {
   type InsertDeal, 
   type Participant, 
   type InsertParticipant,
+  type Order,
+  type InsertOrder,
+  type FulfillmentEvent,
+  type InsertFulfillmentEvent,
   users,
   deals,
   participants,
   emailLogs,
+  orders,
+  fulfillmentEvents,
   type EmailLog
 } from "@shared/schema";
 import { db } from "./db";
@@ -24,6 +30,7 @@ export interface IStorage {
   updateUser(id: string, updates: Partial<UpsertUser>): Promise<User | undefined>;
   
   getDeals(): Promise<Deal[]>;
+  getAllDeals(): Promise<Deal[]>;
   getDeal(id: string): Promise<Deal | undefined>;
   getDealsByCategory(category: string): Promise<Deal[]>;
   getActiveDeals(): Promise<Deal[]>;
@@ -32,11 +39,27 @@ export interface IStorage {
   updateDeal(id: string, deal: Partial<InsertDeal>): Promise<Deal | undefined>;
   deleteDeal(id: string): Promise<boolean>;
   
+  getAllParticipants(): Promise<Participant[]>;
   getParticipantsByDeal(dealId: string): Promise<Participant[]>;
   getParticipantsByUser(userId: string): Promise<Participant[]>;
   getParticipant(id: string): Promise<Participant | undefined>;
   addParticipant(participant: InsertParticipant): Promise<Participant>;
   updateParticipant(id: string, updates: Partial<InsertParticipant>): Promise<Participant | undefined>;
+  deleteParticipant(id: string): Promise<boolean>;
+  
+  getShippingRateForCity(dealId: string, city: string): Promise<{ cost: number } | undefined>;
+  
+  // Orders
+  createOrder(order: InsertOrder): Promise<Order>;
+  getOrder(id: string): Promise<Order | undefined>;
+  getOrdersBySupplier(supplierId: string, filters?: { status?: string; dealId?: string; search?: string }): Promise<Order[]>;
+  getOrdersByCustomer(customerEmail: string): Promise<Order[]>;
+  getOrdersByDeal(dealId: string): Promise<Order[]>;
+  updateOrder(id: string, updates: Partial<InsertOrder>): Promise<Order | undefined>;
+  
+  // Fulfillment Events
+  createFulfillmentEvent(event: InsertFulfillmentEvent): Promise<FulfillmentEvent>;
+  getFulfillmentEventsByOrder(orderId: string): Promise<FulfillmentEvent[]>;
   
   logEmail(log: Partial<EmailLog>): Promise<EmailLog>;
 }
@@ -88,6 +111,10 @@ export class DatabaseStorage implements IStorage {
 
   async getDeals(): Promise<Deal[]> {
     return await db.select().from(deals).where(eq(deals.isActive, "true"));
+  }
+
+  async getAllDeals(): Promise<Deal[]> {
+    return await db.select().from(deals);
   }
 
   async getDeal(id: string): Promise<Deal | undefined> {
@@ -148,6 +175,11 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
+  async getAllParticipants(): Promise<Participant[]> {
+    const result = await db.select().from(participants);
+    return result;
+  }
+
   async getParticipantsByDeal(dealId: string): Promise<Participant[]> {
     const result = await db.select().from(participants).where(eq(participants.dealId, dealId));
     return result.sort((a, b) => a.position - b.position);
@@ -171,6 +203,21 @@ export class DatabaseStorage implements IStorage {
     return participant;
   }
 
+  async getShippingRateForCity(dealId: string, city: string): Promise<{ cost: number } | undefined> {
+    // For now, return a default shipping cost structure
+    // TODO: Implement full shipping rates table
+    const cityRates: Record<string, number> = {
+      'תל אביב': 3000,
+      'ירושלים': 4000,
+      'חיפה': 3500,
+      'באר שבע': 4500,
+      'אילת': 6000,
+    };
+    
+    const cost = cityRates[city] || 3500; // Default 35 NIS
+    return { cost };
+  }
+
   async updateParticipant(id: string, updates: Partial<InsertParticipant>): Promise<Participant | undefined> {
     const [participant] = await db
       .update(participants)
@@ -180,12 +227,96 @@ export class DatabaseStorage implements IStorage {
     return participant;
   }
 
+  async deleteParticipant(id: string): Promise<boolean> {
+    const result = await db.delete(participants).where(eq(participants.id, id)).returning();
+    return result.length > 0;
+  }
+
   async logEmail(log: Partial<EmailLog>): Promise<EmailLog> {
     const [emailLog] = await db
       .insert(emailLogs)
       .values(log as any)
       .returning();
     return emailLog;
+  }
+
+  // Orders
+  async createOrder(orderData: InsertOrder): Promise<Order> {
+    const [order] = await db
+      .insert(orders)
+      .values(orderData)
+      .returning();
+    return order;
+  }
+
+  async getOrder(id: string): Promise<Order | undefined> {
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    return order;
+  }
+
+  async getOrdersBySupplier(
+    supplierId: string, 
+    filters?: { status?: string; dealId?: string; search?: string }
+  ): Promise<Order[]> {
+    const conditions = [eq(orders.supplierId, supplierId)];
+    
+    if (filters?.status) {
+      conditions.push(eq(orders.status, filters.status));
+    }
+    
+    if (filters?.dealId) {
+      conditions.push(eq(orders.dealId, filters.dealId));
+    }
+    
+    const results = await db
+      .select()
+      .from(orders)
+      .where(and(...conditions));
+    
+    if (filters?.search) {
+      const searchLower = filters.search.toLowerCase();
+      return results.filter(o => 
+        o.customerName?.toLowerCase().includes(searchLower) ||
+        o.customerEmail?.toLowerCase().includes(searchLower) ||
+        o.customerPhone?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return results;
+  }
+
+  async getOrdersByCustomer(customerEmail: string): Promise<Order[]> {
+    return await db.select().from(orders).where(eq(orders.customerEmail, customerEmail));
+  }
+
+  async getOrdersByDeal(dealId: string): Promise<Order[]> {
+    return await db.select().from(orders).where(eq(orders.dealId, dealId));
+  }
+
+  async updateOrder(id: string, updates: Partial<InsertOrder>): Promise<Order | undefined> {
+    const [order] = await db
+      .update(orders)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(orders.id, id))
+      .returning();
+    return order;
+  }
+
+  // Fulfillment Events
+  async createFulfillmentEvent(eventData: InsertFulfillmentEvent): Promise<FulfillmentEvent> {
+    const [event] = await db
+      .insert(fulfillmentEvents)
+      .values(eventData)
+      .returning();
+    return event;
+  }
+
+  async getFulfillmentEventsByOrder(orderId: string): Promise<FulfillmentEvent[]> {
+    return await db
+      .select()
+      .from(fulfillmentEvents)
+      .where(eq(fulfillmentEvents.orderId, orderId))
+      .orderBy(desc(fulfillmentEvents.createdAt));
   }
 }
 
@@ -453,6 +584,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.dealsMap.values()).filter(d => d.isActive === "true");
   }
 
+  async getAllDeals(): Promise<Deal[]> {
+    return Array.from(this.dealsMap.values());
+  }
+
   async getDeal(id: string): Promise<Deal | undefined> {
     return this.dealsMap.get(id);
   }
@@ -576,6 +711,10 @@ export class MemStorage implements IStorage {
     });
   }
 
+  async getAllParticipants(): Promise<Participant[]> {
+    return Array.from(this.participantsMap.values());
+  }
+
   async getParticipantsByDeal(dealId: string): Promise<Participant[]> {
     return Array.from(this.participantsMap.values())
       .filter(p => p.dealId === dealId)
@@ -589,6 +728,19 @@ export class MemStorage implements IStorage {
 
   async getParticipant(id: string): Promise<Participant | undefined> {
     return this.participantsMap.get(id);
+  }
+
+  async getShippingRateForCity(dealId: string, city: string): Promise<{ cost: number } | undefined> {
+    const cityRates: Record<string, number> = {
+      'תל אביב': 3000,
+      'ירושלים': 4000,
+      'חיפה': 3500,
+      'באר שבע': 4500,
+      'אילת': 6000,
+    };
+    
+    const cost = cityRates[city] || 3500;
+    return { cost };
   }
 
   async addParticipant(insertParticipant: InsertParticipant): Promise<Participant> {
@@ -628,6 +780,10 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async deleteParticipant(id: string): Promise<boolean> {
+    return this.participantsMap.delete(id);
+  }
+
   async logEmail(log: Partial<EmailLog>): Promise<EmailLog> {
     const id = randomUUID();
     const emailLog: EmailLog = {
@@ -643,6 +799,39 @@ export class MemStorage implements IStorage {
     };
     this.emailLogsMap.set(id, emailLog);
     return emailLog;
+  }
+
+  // Stub implementations for Orders (MemStorage)
+  async createOrder(orderData: InsertOrder): Promise<Order> {
+    throw new Error("Orders not supported in MemStorage");
+  }
+
+  async getOrder(id: string): Promise<Order | undefined> {
+    return undefined;
+  }
+
+  async getOrdersBySupplier(supplierId: string, filters?: any): Promise<Order[]> {
+    return [];
+  }
+
+  async getOrdersByCustomer(customerEmail: string): Promise<Order[]> {
+    return [];
+  }
+
+  async getOrdersByDeal(dealId: string): Promise<Order[]> {
+    return [];
+  }
+
+  async updateOrder(id: string, updates: Partial<InsertOrder>): Promise<Order | undefined> {
+    return undefined;
+  }
+
+  async createFulfillmentEvent(eventData: InsertFulfillmentEvent): Promise<FulfillmentEvent> {
+    throw new Error("Fulfillment events not supported in MemStorage");
+  }
+
+  async getFulfillmentEventsByOrder(orderId: string): Promise<FulfillmentEvent[]> {
+    return [];
   }
 }
 
