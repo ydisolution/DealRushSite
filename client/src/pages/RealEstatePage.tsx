@@ -53,6 +53,17 @@ interface RealEstateProject {
   currentTier: ProjectTier | null;
   nextTier: ProjectTier | null;
   highlights: string[];
+  currentStage: string;
+}
+
+function getStageLabel(stage: string): string {
+  const stageLabels: Record<string, string> = {
+    "PRE_REGISTRATION": "רישום מקדים",
+    "WEBINAR_SCHEDULED": "כנס רוכשים",
+    "FOMO_CONFIRMATION_WINDOW": "רישום סופי",
+    "REGISTRATION_CLOSED": "בחירת נכס וחתימת חוזה",
+  };
+  return stageLabels[stage] || "רישום מקדים";
 }
 
 export default function RealEstatePage() {
@@ -310,7 +321,7 @@ export default function RealEstatePage() {
                     />
                     <div className="absolute top-3 right-3">
                       <Badge className="bg-gradient-to-r from-[#7B2FF7] to-purple-600 text-white">
-                        חסכו עד {project.currentTier?.savingsPercent || project.tiers[0]?.savingsPercent || 0}%
+                        {getStageLabel(project.currentStage)}
                       </Badge>
                     </div>
                   </div>

@@ -160,7 +160,7 @@ function ApartmentPriceCard({ apartment }: { apartment: ApartmentPrice }) {
           <div>
             <p className="text-sm text-gray-600">החל מ-</p>
             <p className="text-2xl font-bold text-blue-600" dir="ltr">
-              ₪{apartment.priceFrom.toLocaleString()}
+              ₪{(apartment.priceFrom || 0).toLocaleString()}
             </p>
           </div>
 

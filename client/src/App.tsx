@@ -20,6 +20,7 @@ import HowItWorksPageRoute from "@/pages/HowItWorksPageRoute";
 import DashboardPage from "@/pages/DashboardPage";
 import CheckoutPage from "@/pages/CheckoutPage";
 import AdminPage from "@/pages/AdminPage";
+import AdminRealEstatePage from "@/pages/AdminRealEstatePage";
 import ClosingTodayPage from "@/pages/ClosingTodayPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
@@ -60,6 +61,7 @@ function Router({ onOpenAuth }: { onOpenAuth: () => void }) {
       <Route path="/checkout/:id" component={CheckoutPage} />
       <Route path="/closing-today" component={ClosingTodayPage} />
       <Route path="/admin" component={AdminPage} />
+      <Route path="/admin/real-estate" component={AdminRealEstatePage} />
       <Route path="/admin/deals/:id/edit" component={AdminEditDeal} />
       <Route path="/supplier">
         {isAuthenticated ? <SupplierDashboard /> : <Home onOpenAuth={onOpenAuth} />}

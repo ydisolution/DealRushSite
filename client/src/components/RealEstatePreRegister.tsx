@@ -11,9 +11,11 @@ interface PreRegisterFormProps {
   projectSlug: string;
   projectTitle?: string;
   onSuccess?: () => void;
+  totalCapacity?: number;
+  currentRegistrantCount?: number;
 }
 
-export default function RealEstatePreRegister({ projectSlug, projectTitle = "", onSuccess }: PreRegisterFormProps) {
+export default function RealEstatePreRegister({ projectSlug, projectTitle = "", onSuccess, totalCapacity, currentRegistrantCount }: PreRegisterFormProps) {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -89,8 +91,15 @@ export default function RealEstatePreRegister({ projectSlug, projectTitle = "", 
       <CardHeader>
         <CardTitle>הרשמה מוקדמת - {projectTitle}</CardTitle>
         <CardDescription>
-          הצטרף לקבוצת הרכישה וקבל הזמנה למצגת הפרויקט
+          הצטרף לקבוצת הרכישה וקבל הזמנה לכנס רוכשים
         </CardDescription>
+        {totalCapacity && currentRegistrantCount !== undefined && (
+          <div className="mt-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+            <p className="text-sm font-semibold text-purple-900 text-center">
+              📊 {currentRegistrantCount} נרשמים מתוך {totalCapacity} מקומות זמינים
+            </p>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">

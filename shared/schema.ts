@@ -515,12 +515,14 @@ export const realEstateProjects = pgTable("real_estate_projects", {
   
   // Stage dates for 4-stage funnel
   earlyRegistrationStart: timestamp("early_registration_start"),
+  earlyRegistrationEnd: timestamp("early_registration_end"), // Deadline for Pre-Registration stage
   presentationEventDate: timestamp("presentation_event_date"),
+  webinarDeadline: timestamp("webinar_deadline"), // Deadline for Webinar stage
   finalRegistrationStart: timestamp("final_registration_start"),
-  finalRegistrationEnd: timestamp("final_registration_end"),
+  finalRegistrationEnd: timestamp("final_registration_end"), // Deadline for Final Registration stage
   
-  // Current stage: EARLY_REGISTRATION | PRESENTATION | FINAL_REGISTRATION | POST_REGISTRATION
-  currentStage: text("current_stage").default("EARLY_REGISTRATION"),
+  // Current stage: PRE_REGISTRATION | WEBINAR_SCHEDULED | FOMO_CONFIRMATION_WINDOW | REGISTRATION_CLOSED
+  currentStage: text("current_stage").default("PRE_REGISTRATION"),
   
   marketPriceBaseline: integer("market_price_baseline").notNull(),
   status: text("status").default("open"), // comingSoon | open | paused | closed

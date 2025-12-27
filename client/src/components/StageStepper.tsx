@@ -6,10 +6,10 @@ interface StageStepperProps {
 
 export default function StageStepper({ currentStage }: StageStepperProps) {
   const stages = [
-    { id: "EARLY_REGISTRATION", label: "רישום מוקדם לאירוע הפרויקט" },
-    { id: "PRESENTATION", label: "אירוע היכרות עם הרוכשים" },
-    { id: "FINAL_REGISTRATION", label: "חלון אישור השתתפות" },
-    { id: "POST_REGISTRATION", label: "בחירת דירה וחתימת חוזה" },
+    { id: "PRE_REGISTRATION", label: "רישום מקדים", shortLabel: "רישום מקדים" },
+    { id: "WEBINAR_SCHEDULED", label: "כנס רוכשים", shortLabel: "כנס רוכשים" },
+    { id: "FOMO_CONFIRMATION_WINDOW", label: "רישום סופי", shortLabel: "רישום סופי" },
+    { id: "REGISTRATION_CLOSED", label: "בחירת נכס וחתימת חוזה", shortLabel: "בחירת נכס וחתימת חוזה" },
   ];
 
   const currentIndex = stages.findIndex((s) => s.id === currentStage);
@@ -39,14 +39,14 @@ export default function StageStepper({ currentStage }: StageStepperProps) {
               <div
                 className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center border-2 transition-all ${
                   isCompleted
-                    ? "bg-[#7B2FF7] border-[#7B2FF7]"
+                    ? "bg-white border-[#7B2FF7]"
                     : isCurrent
                     ? "bg-white border-[#7B2FF7] ring-4 ring-purple-100"
                     : "bg-white border-gray-300"
                 }`}
               >
                 {isCompleted ? (
-                  <Check className="h-4 w-4 md:h-5 md:w-5 text-white" />
+                  <Check className="h-4 w-4 md:h-5 md:w-5 text-green-500" />
                 ) : (
                   <span
                     className={`text-xs md:text-sm font-bold ${
@@ -60,7 +60,7 @@ export default function StageStepper({ currentStage }: StageStepperProps) {
 
               {/* Label */}
               <p
-                className={`mt-2 text-[10px] md:text-xs text-center font-medium max-w-[80px] md:max-w-[100px] leading-tight ${
+                className={`mt-2 text-[10px] md:text-xs text-center font-medium max-w-[90px] md:max-w-[120px] leading-tight whitespace-nowrap ${
                   isCurrent ? "text-[#7B2FF7]" : isCompleted ? "text-gray-700" : "text-gray-400"
                 }`}
               >

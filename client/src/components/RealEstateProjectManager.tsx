@@ -3,7 +3,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Calendar, 
   Users, 
@@ -12,7 +11,6 @@ import {
   AlertCircle,
   Video,
 } from "lucide-react";
-import RealEstatePreRegister from "./RealEstatePreRegister";
 import RealEstateConfirmParticipation from "./RealEstateConfirmParticipation";
 import RealEstateFOMOCountdown from "./RealEstateFOMOCountdown";
 import RealEstateParticipantsList from "./RealEstateParticipantsList";
@@ -84,7 +82,7 @@ export default function RealEstateProjectManager({ projectSlug }: RealEstateProj
   const apartmentPrices = propertyTypes?.map((pt: any) => ({
     type: pt.type,
     label: getApartmentLabel(pt.type),
-    priceFrom: pt.startingFromPrice,
+    priceFrom: pt.startingFromPrice || pt.marketPrice || 0,
     availability: pt.count > 0 ? "available" : "soldout",
   })) || [];
 
@@ -92,35 +90,18 @@ export default function RealEstateProjectManager({ projectSlug }: RealEstateProj
 
   return (
     <div className="space-y-6">
-      {/* Stage Status Header */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">{title}</h3>
-              <p className="text-sm text-gray-500">
-                שלב נוכחי: {getStageLabel(currentStage)}
-              </p>
-            </div>
-            <Badge className={getStageBadgeClass(currentStage)}>
-              {getStageLabel(currentStage)}
-            </Badge>
-          </div>
-
-          {/* User Status */}
-          {myRegistration && (
-            <Alert className="bg-blue-50 border-blue-200">
-              <CheckCircle className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800">
-                <strong>הסטטוס שלך:</strong> {getFunnelStatusLabel(userStatus)}
-                {myRegistration.queuePosition && (
-                  <span className="mr-2">• תור {myRegistration.queuePosition}</span>
-                )}
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+      {/* User Status (if registered) */}
+      {myRegistration && (
+        <Alert className="bg-blue-50 border-blue-200">
+          <CheckCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>הסטטוס שלך:</strong> {getFunnelStatusLabel(userStatus)}
+            {myRegistration.queuePosition && (
+              <span className="mr-2">• תור {myRegistration.queuePosition}</span>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Admin Panel */}
       {isAdmin && (
@@ -137,39 +118,32 @@ export default function RealEstateProjectManager({ projectSlug }: RealEstateProj
 
       {/* Stage-Based Content */}
       {currentStage === "PRE_REGISTRATION" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left: Registration Form */}
-          <div className="space-y-6">
-            {!myRegistration && (
-              <RealEstatePreRegister 
-                projectSlug={projectSlug} 
-                projectTitle={title}
-              />
-            )}
-            {myRegistration && (
-              <Card className="bg-green-50 border-green-200">
-                <CardContent className="p-6 text-center">
-                  <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-3" />
-                  <h3 className="text-xl font-bold text-green-900 mb-2">
-                    נרשמת בהצלחה!
-                  </h3>
-                  <p className="text-green-800">
-                    תקבל הזמנה לווביניר בהקדם
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+        <div className="space-y-8" data-registration-section>
+          {/* Success Message if registered */}
+          {myRegistration && (
+            <Card className="bg-green-50 border-green-200">
+              <CardContent className="p-8 text-center">
+                <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
+                <h3 className="text-2xl font-bold text-green-900 mb-3">
+                  נרשמת בהצלחה!
+                </h3>
+                <p className="text-green-800 text-lg">
+                  תקבל הזמנה לכנס רוכשים בהקדם
+                </p>
+                <p className="text-green-700 mt-2">
+                  מיקומך: {myRegistration.queuePosition || currentRegistrantCount} מתוך {totalCapacity}
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
-            <RealEstatePricing
-              projectName={title}
-              apartmentPrices={apartmentPrices}
-              avgDiscount={avgDiscount}
-              showDetailedDisclaimer={false}
-            />
-          </div>
-
-          {/* Right: Participants List */}
-          <RealEstateParticipantsList projectSlug={projectSlug} showWaitingList={false} />
+          {/* Participants List */}
+          <RealEstateParticipantsList 
+            projectSlug={projectSlug} 
+            showWaitingList={false}
+            totalCapacity={totalCapacity}
+            currentRegistrantCount={currentRegistrantCount}
+          />
         </div>
       )}
 
@@ -179,9 +153,9 @@ export default function RealEstateProjectManager({ projectSlug }: RealEstateProj
             <CardContent className="p-6">
               <div className="flex items-start gap-4">
                 <Video className="h-8 w-8 text-blue-600 shrink-0" />
-                <div>
+                <div className="flex-1">
                   <h3 className="text-lg font-bold text-blue-900 mb-2">
-                    הווביניר מתקרב!
+                    כנס רוכשים מתקרב!
                   </h3>
                   <p className="text-blue-800 mb-3">
                     תאריך: {new Date(webinarDate).toLocaleDateString("he-IL", {
@@ -192,14 +166,17 @@ export default function RealEstateProjectManager({ projectSlug }: RealEstateProj
                       minute: "2-digit",
                     })}
                   </p>
+                  <p className="text-sm text-blue-700 mb-3">
+                    📊 {currentRegistrantCount} נרשמים מתוך {totalCapacity} מקומות זמינים
+                  </p>
                   {webinarLink && (
                     <a
                       href={webinarLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 underline hover:text-blue-800"
+                      className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                     >
-                      קישור לווביניר
+                      קישור לכנס הרוכשים →
                     </a>
                   )}
                 </div>
@@ -207,7 +184,12 @@ export default function RealEstateProjectManager({ projectSlug }: RealEstateProj
             </CardContent>
           </Card>
 
-          <RealEstateParticipantsList projectSlug={projectSlug} showWaitingList={false} />
+          <RealEstateParticipantsList 
+            projectSlug={projectSlug} 
+            showWaitingList={false}
+            totalCapacity={totalCapacity}
+            currentRegistrantCount={currentRegistrantCount}
+          />
         </div>
       )}
 
@@ -222,13 +204,9 @@ export default function RealEstateProjectManager({ projectSlug }: RealEstateProj
             waitingListCount={currentWaitingListCount}
           />
 
-          <Tabs defaultValue="register" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="register">אישור השתתפות</TabsTrigger>
-              <TabsTrigger value="participants">רשימת משתתפים</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="register" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Registration Form */}
+            <div>
               {!myRegistration && (
                 <Alert className="bg-yellow-50 border-yellow-200">
                   <AlertCircle className="h-4 w-4 text-yellow-600" />
@@ -264,12 +242,15 @@ export default function RealEstateProjectManager({ projectSlug }: RealEstateProj
                   </CardContent>
                 </Card>
               )}
-            </TabsContent>
+            </div>
 
-            <TabsContent value="participants">
-              <RealEstateParticipantsList projectSlug={projectSlug} />
-            </TabsContent>
-          </Tabs>
+            {/* Participants List */}
+            <RealEstateParticipantsList 
+              projectSlug={projectSlug}
+              totalCapacity={totalCapacity}
+              currentRegistrantCount={currentRegistrantCount}
+            />
+          </div>
         </div>
       )}
 

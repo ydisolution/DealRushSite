@@ -1101,13 +1101,15 @@ export function registerRealEstateRoutes(app: Express) {
           lastName: projectRegistrations.lastName,
           phone: projectRegistrations.phone,
           finalRegisteredAt: projectRegistrations.finalRegisteredAt,
+          earlyRegisteredAt: projectRegistrations.earlyRegisteredAt,
+          createdAt: projectRegistrations.createdAt,
         })
         .from(projectRegistrations)
         .where(and(
           eq(projectRegistrations.projectId, project.id),
-          sql`${projectRegistrations.funnelStatus} IN ('CONFIRMED_PARTICIPANT', 'WAITING_LIST')`
+          sql`${projectRegistrations.funnelStatus} IN ('PRE_REGISTERED', 'CONFIRMED_PARTICIPANT', 'WAITING_LIST')`
         ))
-        .orderBy(projectRegistrations.queuePosition);
+        .orderBy(projectRegistrations.createdAt);
 
       // Format for public display
       const publicParticipants = participants.map(p => ({
@@ -1116,7 +1118,7 @@ export function registerRealEstateRoutes(app: Express) {
         phoneLast4: p.phone?.slice(-4) || '****',
         apartmentType: p.selectedApartmentType,
         status: p.funnelStatus,
-        registeredAt: p.finalRegisteredAt,
+        registeredAt: p.finalRegisteredAt || p.earlyRegisteredAt || p.createdAt,
       }));
 
       res.json({
