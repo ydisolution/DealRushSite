@@ -90,24 +90,12 @@ export async function getStripePublishableKey() {
 }
 
 export async function getStripeSecretKey() {
-  const { secretKey } = await getCredentials();
-  return secretKey;
-}
-
-let stripeSync: any = null;
-
-export async function getStripeSync() {
-  if (!stripeSync) {
-    const { StripeSync } = await import('stripe-replit-sync');
-    const secretKey = await getStripeSecretKey();
-
-    stripeSync = new StripeSync({
-      poolConfig: {
-        connectionString: process.env.DATABASE_URL!,
-        max: 2,
-      },
-      stripeSecretKey: secretKey,
-    });
+  const credentials = await getCredentials();
+  if (!credentials) {
+    return null;
   }
-  return stripeSync;
+  return credentials.secretKey;
 }
+
+// Removed Replit-specific StripeSync functionality for deployment compatibility
+// This was only used in Replit environment and is not needed for production
